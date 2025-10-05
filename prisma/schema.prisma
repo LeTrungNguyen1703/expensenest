@@ -1,0 +1,256 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model audit_logs {
+  log_id      Int       @id @default(autoincrement())
+  user_id     Int
+  action      String    @db.VarChar(100)
+  entity_type String    @db.VarChar(50)
+  entity_id   Int
+  old_values  Json?
+  new_values  Json?
+  ip_address  String?   @db.Inet
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  users       users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_audit_logs_created")
+  @@index([entity_type, entity_id], map: "idx_audit_logs_entity")
+  @@index([user_id], map: "idx_audit_logs_user")
+}
+
+model budgets {
+  budget_id   Int              @id @default(autoincrement())
+  budget_name String           @db.VarChar(255)
+  category_id Int
+  amount      Int
+  period_type period_type_enum
+  start_date  DateTime         @db.Date
+  end_date    DateTime?        @db.Date
+  is_active   Boolean?         @default(true)
+  user_id     Int
+  created_at  DateTime?        @default(now()) @db.Timestamp(6)
+  updated_at  DateTime?        @default(now()) @db.Timestamp(6)
+  categories  categories       @relation(fields: [category_id], references: [category_id], onDelete: NoAction, onUpdate: NoAction)
+  users       users            @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([is_active], map: "idx_budgets_active")
+  @@index([category_id], map: "idx_budgets_category")
+  @@index([user_id], map: "idx_budgets_user")
+}
+
+model categories {
+  category_id            Int                      @id @default(autoincrement())
+  category_name          String                   @db.VarChar(255)
+  transaction_type       transaction_type_enum
+  description            String?
+  user_id                Int?
+  created_at             DateTime?                @default(now()) @db.Timestamp(6)
+  budgets                budgets[]
+  users                  users?                   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  expenses               expenses[]
+  recurring_transactions recurring_transactions[]
+
+  @@index([transaction_type], map: "idx_categories_type")
+  @@index([user_id], map: "idx_categories_user")
+}
+
+model expenses {
+  expense_id                 Int                          @id @default(autoincrement())
+  title                      String                       @db.VarChar(255)
+  amount                     Int
+  transaction_type           transaction_type_enum
+  category_id                Int
+  wallet_id                  Int
+  expense_date               DateTime                     @db.Date
+  description                String?
+  user_id                    Int
+  recurring_transaction_id   Int?
+  created_at                 DateTime?                    @default(now()) @db.Timestamp(6)
+  updated_at                 DateTime?                    @default(now()) @db.Timestamp(6)
+  categories                 categories                   @relation(fields: [category_id], references: [category_id], onDelete: NoAction, onUpdate: NoAction)
+  users                      users                        @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  wallets                    wallets                      @relation(fields: [wallet_id], references: [wallet_id], onDelete: NoAction, onUpdate: NoAction)
+  recurring_transactions     recurring_transactions?      @relation(fields: [recurring_transaction_id], references: [recurring_id], onUpdate: NoAction, map: "fk_expenses_recurring")
+  recurring_transaction_logs recurring_transaction_logs[]
+  savings_contributions      savings_contributions[]
+
+  @@index([category_id], map: "idx_expenses_category")
+  @@index([expense_date], map: "idx_expenses_date")
+  @@index([recurring_transaction_id], map: "idx_expenses_recurring")
+  @@index([transaction_type], map: "idx_expenses_type")
+  @@index([user_id], map: "idx_expenses_user")
+  @@index([wallet_id], map: "idx_expenses_wallet")
+}
+
+model invalidated_tokens {
+  token_id       String    @id @db.VarChar(255)
+  user_id        Int
+  expiry_time    DateTime  @db.Timestamp(6)
+  invalidated_at DateTime? @default(now()) @db.Timestamp(6)
+  users          users     @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([expiry_time], map: "idx_invalidated_tokens_expiry")
+}
+
+model recurring_transaction_logs {
+  log_id                 Int                    @id @default(autoincrement())
+  recurring_id           Int
+  scheduled_date         DateTime               @db.Date
+  executed_date          DateTime?              @db.Date
+  expense_id             Int?
+  status                 String                 @default("PENDING") @db.VarChar(20)
+  notes                  String?
+  created_at             DateTime?              @default(now()) @db.Timestamp(6)
+  expenses               expenses?              @relation(fields: [expense_id], references: [expense_id], onUpdate: NoAction)
+  recurring_transactions recurring_transactions @relation(fields: [recurring_id], references: [recurring_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([recurring_id], map: "idx_recurring_logs_recurring")
+  @@index([scheduled_date], map: "idx_recurring_logs_scheduled")
+  @@index([status], map: "idx_recurring_logs_status")
+}
+
+model recurring_transactions {
+  recurring_id               Int                          @id @default(autoincrement())
+  user_id                    Int
+  title                      String                       @db.VarChar(255)
+  amount                     Int
+  transaction_type           transaction_type_enum
+  category_id                Int
+  wallet_id                  Int
+  frequency                  frequency_enum
+  start_date                 DateTime                     @db.Date
+  end_date                   DateTime?                    @db.Date
+  next_occurrence            DateTime                     @db.Date
+  last_occurrence            DateTime?                    @db.Date
+  description                String?
+  is_active                  Boolean?                     @default(true)
+  auto_create                Boolean?                     @default(true)
+  reminder_days_before       Int?                         @default(1)
+  created_at                 DateTime?                    @default(now()) @db.Timestamp(6)
+  updated_at                 DateTime?                    @default(now()) @db.Timestamp(6)
+  expenses                   expenses[]
+  recurring_transaction_logs recurring_transaction_logs[]
+  categories                 categories                   @relation(fields: [category_id], references: [category_id], onDelete: NoAction, onUpdate: NoAction)
+  users                      users                        @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  wallets                    wallets                      @relation(fields: [wallet_id], references: [wallet_id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([is_active], map: "idx_recurring_active")
+  @@index([category_id], map: "idx_recurring_category")
+  @@index([next_occurrence], map: "idx_recurring_next_occurrence")
+  @@index([user_id], map: "idx_recurring_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model savings_contributions {
+  contribution_id   Int           @id @default(autoincrement())
+  goal_id           Int
+  amount            Int
+  contribution_date DateTime      @default(dbgenerated("CURRENT_DATE")) @db.Date
+  notes             String?
+  expense_id        Int?
+  user_id           Int
+  created_at        DateTime?     @default(now()) @db.Timestamp(6)
+  expenses          expenses?     @relation(fields: [expense_id], references: [expense_id], onUpdate: NoAction)
+  savings_goals     savings_goals @relation(fields: [goal_id], references: [goal_id], onDelete: Cascade, onUpdate: NoAction)
+  users             users         @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([contribution_date], map: "idx_savings_contributions_date")
+  @@index([goal_id], map: "idx_savings_contributions_goal")
+  @@index([user_id], map: "idx_savings_contributions_user")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model savings_goals {
+  goal_id               Int                     @id @default(autoincrement())
+  user_id               Int
+  goal_name             String                  @db.VarChar(255)
+  description           String?
+  target_amount         Int
+  current_amount        Int?                    @default(0)
+  target_date           DateTime?               @db.Date
+  priority              Int?                    @default(0)
+  icon                  String?                 @db.VarChar(100)
+  color                 String?                 @db.VarChar(20)
+  wallet_id             Int?
+  status                goal_status_enum?       @default(ACTIVE)
+  is_recurring          Boolean?                @default(false)
+  created_at            DateTime?               @default(now()) @db.Timestamp(6)
+  updated_at            DateTime?               @default(now()) @db.Timestamp(6)
+  completed_at          DateTime?               @db.Timestamp(6)
+  savings_contributions savings_contributions[]
+  users                 users                   @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+  wallets               wallets?                @relation(fields: [wallet_id], references: [wallet_id], onUpdate: NoAction)
+
+  @@index([status], map: "idx_savings_goals_status")
+  @@index([target_date], map: "idx_savings_goals_target_date")
+  @@index([user_id], map: "idx_savings_goals_user")
+}
+
+model users {
+  user_id                Int                      @id @default(autoincrement())
+  username               String                   @unique @db.VarChar(100)
+  email                  String                   @unique @db.VarChar(255)
+  password_hash          String                   @db.VarChar(255)
+  full_name              String?                  @db.VarChar(255)
+  created_at             DateTime?                @default(now()) @db.Timestamp(6)
+  updated_at             DateTime?                @default(now()) @db.Timestamp(6)
+  is_active              Boolean?                 @default(true)
+  audit_logs             audit_logs[]
+  budgets                budgets[]
+  categories             categories[]
+  expenses               expenses[]
+  invalidated_tokens     invalidated_tokens[]
+  recurring_transactions recurring_transactions[]
+  savings_contributions  savings_contributions[]
+  savings_goals          savings_goals[]
+  wallets                wallets[]
+}
+
+model wallets {
+  wallet_id              Int                      @id @default(autoincrement())
+  wallet_name            String                   @db.VarChar(255)
+  balance                Int?                     @default(0)
+  user_id                Int
+  created_at             DateTime?                @default(now()) @db.Timestamp(6)
+  updated_at             DateTime?                @default(now()) @db.Timestamp(6)
+  expenses               expenses[]
+  recurring_transactions recurring_transactions[]
+  savings_goals          savings_goals[]
+  users                  users                    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id], map: "idx_wallets_user")
+}
+
+enum frequency_enum {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum goal_status_enum {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  CANCELLED
+}
+
+enum period_type_enum {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+enum transaction_type_enum {
+  INCOME
+  EXPENSE
+}
