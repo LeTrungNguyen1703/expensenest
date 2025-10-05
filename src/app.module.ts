@@ -10,15 +10,20 @@ import {BullModule} from "@nestjs/bullmq";
 import {UserModule} from './user/user.module';
 import {PrismaModule} from "./prisma/prisma.module";
 import {AuthModule} from "./auth/auth.module";
-import { BudgetsModule } from './budgets/budgets.module';
-import { CategoriesModule } from './categories/categories.module';
-import { ExpensesModule } from './expenses/expenses.module';
-import { RecurringTransactionsModule } from './recurring-transactions/recurring-transactions.module';
-import { SavingsContributionsModule } from './savings-contributions/savings-contributions.module';
-import { RecurringTransactionLogsModule } from './recurring_transaction_logs/recurring_transaction_logs.module';
-import { InvalidatedTokensModule } from './invalidated-tokens/invalidated-tokens.module';
-import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
-import { WalletsModule } from './wallets/wallets.module';
+import {BudgetsModule} from './budgets/budgets.module';
+import {CategoriesModule} from './categories/categories.module';
+import {ExpensesModule} from './expenses/expenses.module';
+import {RecurringTransactionsModule} from './recurring-transactions/recurring-transactions.module';
+import {SavingsContributionsModule} from './savings-contributions/savings-contributions.module';
+import {RecurringTransactionLogsModule} from './recurring_transaction_logs/recurring_transaction_logs.module';
+import {InvalidatedTokensModule} from './invalidated-tokens/invalidated-tokens.module';
+import {SavingsGoalsModule} from './savings-goals/savings-goals.module';
+import {WalletsModule} from './wallets/wallets.module';
+import {QUEUE_NAMES, JOB_NAMES} from "../queue-constants";
+import {BullBoardModule} from "@bull-board/nestjs";
+import {ExpressAdapter} from "@bull-board/express";
+import {BullMQAdapter} from "@bull-board/api/bullMQAdapter";
+import {AdminModule} from './admin/admin.module';
 
 @Module({
     imports: [ConfigModule.forRoot({
@@ -43,7 +48,21 @@ import { WalletsModule } from './wallets/wallets.module';
             connection: {
                 host: 'localhost',
                 port: 6379,
-            },
+            }
+        }),
+        BullModule.registerQueue({
+            name: QUEUE_NAMES.RECURRING_TRANSACTIONS
+        }),
+        // Config Bull Board
+        BullBoardModule.forRoot({
+            route: '/admin/queues',
+            adapter: ExpressAdapter, // hoặc FastifyAdapter nếu dùng Fastify
+        }),
+
+        // Đăng ký queues vào Bull Board
+        BullBoardModule.forFeature({
+            name: QUEUE_NAMES.RECURRING_TRANSACTIONS,
+            adapter: BullMQAdapter, // ⚠️ Quan trọng: dùng BullMQAdapter
         }),
         UserModule,
         PrismaModule,
@@ -56,7 +75,8 @@ import { WalletsModule } from './wallets/wallets.module';
         RecurringTransactionLogsModule,
         InvalidatedTokensModule,
         SavingsGoalsModule,
-        WalletsModule
+        WalletsModule,
+        AdminModule
     ],
     controllers: [AppController],
     providers: [AppService],
