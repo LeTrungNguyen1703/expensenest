@@ -15,17 +15,8 @@ import {UserService} from './user.service';
 import {CreateUserDto} from './dto/create-user.dto';
 import {UpdateUserDto} from './dto/update-user.dto';
 import {JwtAuthGuard} from '../auth/jwt-auth.guard';
-import {
-    ApiTags,
-    ApiOperation,
-    ApiResponse,
-    ApiParam,
-    ApiBody,
-    ApiBearerAuth,
-    ApiUnauthorizedResponse
-} from '@nestjs/swagger';
+import {ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth, ApiUnauthorizedResponse} from '@nestjs/swagger';
 import {UserResponse} from './interfaces/user.interface';
-import {isArray} from "class-validator";
 
 @ApiTags('users')
 @ApiBearerAuth() // add Bearer auth to Swagger for this controller
@@ -47,9 +38,8 @@ export class UserController {
     @Get()
     @UseGuards(JwtAuthGuard)
     @ApiOperation({summary: 'Get all users'})
-    @ApiResponse({status: 200, description: 'Returns all users', type: UserResponse, isArray: true})
+    @ApiResponse({status: 200, description: 'Returns all users', type: [UserResponse]})
     @ApiUnauthorizedResponse({description: 'Unauthorized'}) // indicate 401 in Swagger
-    @ApiBearerAuth('access-token')
     async findAll(): Promise<UserResponse[]> {
         return this.userService.findAll();
     }
@@ -60,7 +50,6 @@ export class UserController {
     @ApiParam({name: 'id', description: 'User ID', type: 'number'})
     @ApiResponse({status: 200, description: 'Returns the user', type: UserResponse})
     @ApiResponse({status: 404, description: 'User not found'})
-    @ApiBearerAuth('access-token')
     @ApiUnauthorizedResponse({description: 'Unauthorized'})
     async findOne(@Param('id', ParseIntPipe) id: number): Promise<UserResponse> {
         return this.userService.findOne(id);
@@ -71,8 +60,7 @@ export class UserController {
     @ApiOperation({summary: 'Update a user'})
     @ApiParam({name: 'id', description: 'User ID', type: 'number'})
     @ApiBody({type: UpdateUserDto, description: 'User update data'})
-    @ApiResponse({status: 200, description: 'User successfully updated'})
-    @ApiBearerAuth('access-token')
+    @ApiResponse({status: 200, description: 'User successfully updated', type: UserResponse})
     @ApiResponse({status: 404, description: 'User not found'})
     @ApiResponse({status: 409, description: 'Username or email already exists'})
     @ApiUnauthorizedResponse({description: 'Unauthorized'})
@@ -86,11 +74,9 @@ export class UserController {
     @Delete(':id')
     @UseGuards(JwtAuthGuard)
     @ApiOperation({summary: 'Delete a user'})
-    @ApiBearerAuth('access-token')
     @ApiParam({name: 'id', description: 'User ID', type: 'number'})
     @ApiResponse({status: 200, description: 'User successfully deleted'})
     @ApiResponse({status: 404, description: 'User not found'})
-    @ApiBearerAuth('access-token')
     @ApiUnauthorizedResponse({description: 'Unauthorized'})
     @HttpCode(HttpStatus.OK)
     async remove(@Param('id', ParseIntPipe) id: number): Promise<{ message: string; user: Partial<UserResponse> }> {
