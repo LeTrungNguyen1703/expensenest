@@ -10,8 +10,8 @@ async function bootstrap() {
     app.useWebSocketAdapter(new IoAdapter(app)); // Pass the app instance
     // Swagger setup
     const config = new DocumentBuilder()
-        .setTitle('Task Manager API')
-        .setDescription('API documentation for Task Manager V2')
+        .setTitle('Expense Manager API')
+        .setDescription('API documentation for Expense Manager')
         .setVersion('1.0')
         .addBearerAuth(
             {type: 'http', scheme: 'bearer', bearerFormat: 'JWT'},

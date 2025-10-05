@@ -9,6 +9,7 @@ import KeyvRedis from "@keyv/redis";
 import {BullModule} from "@nestjs/bullmq";
 import {UserModule} from './user/user.module';
 import {PrismaModule} from "./prisma/prisma.module";
+import {AuthModule} from "./auth/auth.module";
 
 @Module({
     imports: [ConfigModule.forRoot({
@@ -36,7 +37,8 @@ import {PrismaModule} from "./prisma/prisma.module";
             },
         }),
         UserModule,
-        PrismaModule
+        PrismaModule,
+        AuthModule
     ],
     controllers: [AppController],
     providers: [AppService],
