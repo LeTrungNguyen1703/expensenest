@@ -23,6 +23,7 @@ async function bootstrap() {
         .addTag('categories', 'Category management endpoints')
         .addTag('savings-goals', 'Savings goals management endpoints')
         .addTag('recurring-transactions', 'Recurring transactions management endpoints')
+        .addTag('expenses', 'Expense/Income management endpoints')
         .addTag('auth', 'Authentication endpoints')
         .build();
 
