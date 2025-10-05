@@ -289,7 +289,7 @@ export class RecurringTransactionsService {
         await this.prisma.$transaction(async (tx) => {
             // 1. Tạo expense nếu auto_create = true
             if (recurring.auto_create) {
-                await tx.expenses.create({
+                const expense = await tx.expenses.create({
                     data: {
                         user_id: recurring.user_id,
                         title: recurring.title,
@@ -304,7 +304,7 @@ export class RecurringTransactionsService {
                     },
                 });
 
-                this.logger.log(`✅ Created expense from recurring #${recurringId}`);
+                this.logger.log(`✅ Created expense #${expense} from recurring #${recurringId}`);
             }
             //
             // // 2. Log lại việc xử lý
