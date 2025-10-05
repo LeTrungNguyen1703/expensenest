@@ -10,6 +10,15 @@ import {BullModule} from "@nestjs/bullmq";
 import {UserModule} from './user/user.module';
 import {PrismaModule} from "./prisma/prisma.module";
 import {AuthModule} from "./auth/auth.module";
+import { BudgetsModule } from './budgets/budgets.module';
+import { CategoriesModule } from './categories/categories.module';
+import { ExpensesModule } from './expenses/expenses.module';
+import { RecurringTransactionsModule } from './recurring-transactions/recurring-transactions.module';
+import { SavingsContributionsModule } from './savings-contributions/savings-contributions.module';
+import { RecurringTransactionLogsModule } from './recurring_transaction_logs/recurring_transaction_logs.module';
+import { InvalidatedTokensModule } from './invalidated-tokens/invalidated-tokens.module';
+import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
+import { WalletsModule } from './wallets/wallets.module';
 
 @Module({
     imports: [ConfigModule.forRoot({
@@ -38,7 +47,16 @@ import {AuthModule} from "./auth/auth.module";
         }),
         UserModule,
         PrismaModule,
-        AuthModule
+        AuthModule,
+        BudgetsModule,
+        CategoriesModule,
+        ExpensesModule,
+        RecurringTransactionsModule,
+        SavingsContributionsModule,
+        RecurringTransactionLogsModule,
+        InvalidatedTokensModule,
+        SavingsGoalsModule,
+        WalletsModule
     ],
     controllers: [AppController],
     providers: [AppService],
