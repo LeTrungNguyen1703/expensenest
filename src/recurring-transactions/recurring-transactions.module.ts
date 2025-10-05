@@ -5,5 +5,6 @@ import { RecurringTransactionsController } from './recurring-transactions.contro
 @Module({
   controllers: [RecurringTransactionsController],
   providers: [RecurringTransactionsService],
+  exports: [RecurringTransactionsService],
 })
 export class RecurringTransactionsModule {}
