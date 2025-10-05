@@ -20,6 +20,7 @@ async function bootstrap() {
         )
         .addTag('users', 'User management endpoints')
         .addTag('wallets', 'Wallet management endpoints')
+        .addTag('categories', 'Category management endpoints')
         .addTag('auth', 'Authentication endpoints')
         .build();
 
