@@ -24,6 +24,9 @@ import {BullBoardModule} from "@bull-board/nestjs";
 import {ExpressAdapter} from "@bull-board/express";
 import {BullMQAdapter} from "@bull-board/api/bullMQAdapter";
 import {AdminModule} from './admin/admin.module';
+import { ExpenseGateway } from './expense-gateway/expense.gateway';
+import { ExpenseGatewayModuleModule } from './expense-gateway/expense-gateway.module/expense-gateway.module.module';
+import { ExpenseGatewayModule } from './expense-gateway/expense-gateway.module';
 
 @Module({
     imports: [ConfigModule.forRoot({
@@ -76,10 +79,12 @@ import {AdminModule} from './admin/admin.module';
         InvalidatedTokensModule,
         SavingsGoalsModule,
         WalletsModule,
-        AdminModule
+        AdminModule,
+        ExpenseGatewayModuleModule,
+        ExpenseGatewayModule
     ],
     controllers: [AppController],
-    providers: [AppService],
+    providers: [AppService, ExpenseGateway],
 })
 export class AppModule {
 }

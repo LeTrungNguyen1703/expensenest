@@ -4,6 +4,7 @@ import {Job} from "bullmq";
 import {Logger} from "@nestjs/common";
 import {RecurringTransactionsService} from "../recurring-transactions.service";
 import {ExpenseResponse} from "../../expenses/interfaces/expense.interface";
+import {RecurringTransactionQueue} from "./recurring-transaction.queue";
 
 
 @Processor(QUEUE_NAMES.RECURRING_TRANSACTIONS)
@@ -11,7 +12,8 @@ export class RecurringTransactionProcessor extends WorkerHost {
 
     private logger = new Logger(RecurringTransactionProcessor.name);
 
-    constructor(private readonly recurringTransactionService: RecurringTransactionsService) {
+    constructor(private readonly recurringTransactionService: RecurringTransactionsService,
+                private readonly queue: RecurringTransactionQueue) {
         super();
     }
 
@@ -23,9 +25,6 @@ export class RecurringTransactionProcessor extends WorkerHost {
             case JOB_NAMES.PROCESS_SINGLE_RECURRING: {
                 return this.handleSingleRecurring(job);
             }
-            case JOB_NAMES.NOTIFICATION_RECURRING_AFTER_CREATE_EXPENSE: {
-                return this.handleNotificationAfterCreateExpense(job);
-            }
         }
     }
 
@@ -33,13 +32,15 @@ export class RecurringTransactionProcessor extends WorkerHost {
         this.logger.log(`Processing daily check for due recurring transactions, job id: ${job.id}`);
 
         try {
-            const processedCount = await this.recurringTransactionService.processDueTransactions();
-            this.logger.log(`Processed ${processedCount} due recurring transactions.`);
+            const dueTransactions = await this.recurringTransactionService.processDueTransactions();
+            this.logger.log(`Processed ${dueTransactions} due recurring transactions.`);
 
-            //TODO: add notification to users about processed transactions
+            for (const transaction of dueTransactions) {
+                await this.queue.processRecurringTransaction(transaction.recurring_id)
+            }
             return {
                 success: true,
-                processedCount: processedCount,
+                dueTransaction: dueTransactions,
                 processedAt: new Date(),
             };
         } catch (error) {
@@ -69,9 +70,4 @@ export class RecurringTransactionProcessor extends WorkerHost {
 
     }
 
-    async handleNotificationAfterCreateExpense(job: Job<{ expense: ExpenseResponse }>) {
-        //TODO: implement notification logic
-        this.logger.log(`Handling notifications after creating expense, job id: ${job.id}`);
-        const {expense} = job.data;
-    }
 }

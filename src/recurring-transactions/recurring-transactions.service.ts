@@ -266,12 +266,7 @@ export class RecurringTransactionsService {
 
         this.logger.log(`Found ${dueTransactions.length} due transactions`);
 
-        // Đẩy từng transaction vào queue để xử lý song song
-        for (const transaction of dueTransactions) {
-            await this.queue.processRecurringTransaction(transaction.recurring_id);
-        }
-
-        return dueTransactions.length;
+        return dueTransactions;
     }
 
     /**
@@ -306,7 +301,7 @@ export class RecurringTransactionsService {
 
                 this.logger.log(`✅ Created expense #${expense} from recurring #${recurringId}`);
             }
-            //
+            //TODO:
             // // 2. Log lại việc xử lý
             // await tx.recurring_transaction_logs.create({
             //   data: {
@@ -333,7 +328,7 @@ export class RecurringTransactionsService {
                 },
             });
 
-            // // 5. Gửi notification nếu cần (không auto_create)
+            // // 5. Send notification
             // // TODO: Implement notification service
             // this.logger.log(`📩 Should send reminder for recurring #${recurringId}`);
             // await this.queue.processNotificationRecurringAfterCreateExpense()
