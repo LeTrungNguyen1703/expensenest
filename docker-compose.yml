@@ -22,7 +22,7 @@ services:
     container_name: expense-app
     restart: always
     ports:
-      - '3000:3000'
+      - '3001:3000'
     env_file:
       - .env
     depends_on:
