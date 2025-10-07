@@ -13,12 +13,8 @@ COPY prisma ./prisma
 COPY tsconfig*.json nest-cli.json ./
 COPY src ./src
 
-# ✅ Nhận DATABASE_URL từ Railway (cần cho `prisma generate`)
-ARG DATABASE_URL
-ENV DATABASE_URL=${DATABASE_URL}
-
-# Build (chạy prisma generate + nest build)
-RUN npm run build --silent
+# Build (chỉ build TypeScript; tránh chạy prisma generate tại build-time vì có thể thiếu DATABASE_URL)
+RUN npx nest build --silent
 
 # ===============================
 # 🚀 Runner stage
