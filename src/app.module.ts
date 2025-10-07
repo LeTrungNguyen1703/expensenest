@@ -37,30 +37,84 @@ import {QUEUE_NAMES} from "./queue-constants";
             isGlobal: true,
             inject: [ConfigService],
             useFactory: async (config: ConfigService) => {
-                // Use a single full REDIS_URL for cache (required)
                 const redisUrl = config.get<string | undefined>('REDIS_URL');
+
+                // Fallback to memory-only cache if Redis is not available
                 if (!redisUrl) {
-                    throw new Error('REDIS_URL is required in environment for cache configuration');
+                    console.warn('[Cache] REDIS_URL not set. Using memory-only cache.');
+                    return {
+                        stores: [
+                            new Keyv({
+                                store: new CacheableMemory({ttl: 60000, lruSize: 5000}),
+                            }),
+                        ],
+                    };
                 }
 
-                return {
-                    stores: [
-                        new Keyv({
-                            store: new CacheableMemory({ttl: 60000, lruSize: 5000}),
-                        }),
-                        new KeyvRedis(redisUrl),
-                    ],
-                };
+                try {
+                    console.log('[Cache] Connecting to Redis...');
+                    return {
+                        stores: [
+                            new Keyv({
+                                store: new CacheableMemory({ttl: 60000, lruSize: 5000}),
+                            }),
+                            new KeyvRedis(redisUrl),
+                        ],
+                    };
+                } catch (error) {
+                    console.error('[Cache] Failed to connect to Redis, falling back to memory cache:', error.message);
+                    return {
+                        stores: [
+                            new Keyv({
+                                store: new CacheableMemory({ttl: 60000, lruSize: 5000}),
+                            }),
+                        ],
+                    };
+                }
             },
         }),
         BullModule.forRootAsync({
             inject: [ConfigService],
             useFactory: async (config: ConfigService) => {
                 const redisUrl = config.get<string | undefined>('REDIS_URL');
+
                 if (!redisUrl) {
-                    throw new Error('REDIS_URL is required in environment for BullMQ configuration');
+                    console.warn('[BullMQ] REDIS_URL not set. Queue functionality will be limited.');
+                    // Return a default config - BullMQ will fail gracefully if Redis is not available
+                    return {
+                        connection: {
+                            host: 'localhost',
+                            port: 6379,
+                            maxRetriesPerRequest: null,
+                            enableReadyCheck: false,
+                            retryStrategy: (times) => {
+                                console.warn(`[BullMQ] Redis connection retry attempt ${times}`);
+                                if (times > 10) {
+                                    console.error('[BullMQ] Max retries reached, giving up');
+                                    return null;
+                                }
+                                return Math.min(times * 1000, 10000);
+                            },
+                        }
+                    };
                 }
-                return { connection: { url: redisUrl } };
+
+                console.log('[BullMQ] Connecting to Redis...');
+                return {
+                    connection: {
+                        url: redisUrl,
+                        maxRetriesPerRequest: null,
+                        enableReadyCheck: false,
+                        retryStrategy: (times) => {
+                            console.warn(`[BullMQ] Redis connection retry attempt ${times}`);
+                            if (times > 10) {
+                                console.error('[BullMQ] Max retries reached');
+                                return null;
+                            }
+                            return Math.min(times * 1000, 10000);
+                        },
+                    }
+                };
             },
         }),
         BullModule.registerQueue({
