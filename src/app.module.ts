@@ -50,7 +50,6 @@ import {QUEUE_NAMES} from "./queue-constants";
                         ],
                     };
                 }
-
                 try {
                     console.log('[Cache] Connecting to Redis...');
                     return {
