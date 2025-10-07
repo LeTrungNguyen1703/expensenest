@@ -2,7 +2,7 @@ import {Module} from '@nestjs/common';
 import {AppController} from './app.controller';
 import {AppService} from './app.service';
 import {jwtConstants} from "./auth/constants";
-import {ConfigModule} from "@nestjs/config";
+import {ConfigModule, ConfigService} from "@nestjs/config";
 import {CacheModule} from "@nestjs/cache-manager";
 import {CacheableMemory, Keyv} from "cacheable";
 import KeyvRedis from "@keyv/redis";
@@ -35,22 +35,33 @@ import { AblyModule } from './ably/ably.module';
     }),
         CacheModule.registerAsync({
             isGlobal: true,
-            useFactory: async () => {
+            inject: [ConfigService],
+            useFactory: async (config: ConfigService) => {
+                // Use a single full REDIS_URL for cache (required)
+                const redisUrl = config.get<string | undefined>('REDIS_URL');
+                if (!redisUrl) {
+                    throw new Error('REDIS_URL is required in environment for cache configuration');
+                }
+
                 return {
                     stores: [
                         new Keyv({
                             store: new CacheableMemory({ttl: 60000, lruSize: 5000}),
                         }),
-                        new KeyvRedis('redis://localhost:6379'),
+                        new KeyvRedis(redisUrl),
                     ],
                 };
             },
         }),
-        BullModule.forRoot({
-            connection: {
-                host: 'localhost',
-                port: 6379,
-            }
+        BullModule.forRootAsync({
+            inject: [ConfigService],
+            useFactory: async (config: ConfigService) => {
+                const redisUrl = config.get<string | undefined>('REDIS_URL');
+                if (!redisUrl) {
+                    throw new Error('REDIS_URL is required in environment for BullMQ configuration');
+                }
+                return { connection: { url: redisUrl } };
+            },
         }),
         BullModule.registerQueue({
             name: QUEUE_NAMES.RECURRING_TRANSACTIONS
