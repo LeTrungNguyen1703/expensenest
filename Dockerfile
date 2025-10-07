@@ -13,6 +13,9 @@ COPY prisma ./prisma
 COPY tsconfig*.json nest-cli.json ./
 COPY src ./src
 
+# Generate Prisma Client (cần thiết để build TypeScript code)
+RUN npx prisma generate
+
 # Build TypeScript
 RUN npx nest build
 
