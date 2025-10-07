@@ -5,7 +5,7 @@ import {TokenParams} from 'ably';
 import {ABLY_CLIENT} from "./constant.ably";
 
 @Controller('ably')
-export class AblyAuthController {
+export class AblyController {
     constructor(
         @Inject(ABLY_CLIENT) private readonly ablyClient: Ably.Realtime,
     ) {
