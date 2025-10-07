@@ -13,11 +13,11 @@ COPY prisma ./prisma
 COPY tsconfig*.json nest-cli.json ./
 COPY src ./src
 
-# Build (chỉ build TypeScript; tránh chạy prisma generate tại build-time vì có thể thiếu DATABASE_URL)
-RUN npx nest build --silent
+# Build TypeScript
+RUN npx nest build
 
 # ===============================
-# 🚀 Runner stage
+# 🚀Runner stage
 # ===============================
 FROM node:20-alpine AS runner
 WORKDIR /app
