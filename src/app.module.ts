@@ -38,9 +38,9 @@ import {QUEUE_NAMES} from "./queue-constants";
             inject: [ConfigService],
             useFactory: async (config: ConfigService) => {
                 // Railway provides REDIS_PRIVATE_URL for internal connections
-                // Fallback to REDIS_PUBLIC_URL for local/public connections
+                // Fallback to REDIS_URL for local/public connections
                 const redisUrl = config.get<string | undefined>('REDIS_PRIVATE_URL')
-                    || config.get<string | undefined>('REDIS_PUBLIC_URL');
+                    || config.get<string | undefined>('REDIS_URL');
 
                 // Fallback to memory-only cache if Redis is not available
                 if (!redisUrl) {
@@ -79,15 +79,16 @@ import {QUEUE_NAMES} from "./queue-constants";
             inject: [ConfigService],
             useFactory: async (config: ConfigService) => {
                 // Railway provides REDIS_PRIVATE_URL for internal connections
-                // Fallback to REDIS_PUBLIC_URL for local/public connections
+                // Fallback to REDIS_URL for local/public connections
                 const redisUrl = config.get<string | undefined>('REDIS_PRIVATE_URL')
-                    || config.get<string | undefined>('REDIS_PUBLIC_URL');
+                    || config.get<string | undefined>('REDIS_URL');
 
                 if (!redisUrl) {
                     console.warn('[BullMQ] No Redis URL configured. Queue functionality will be limited.');
                     // Return a default config - BullMQ will fail gracefully if Redis is not available
                     return {
                         connection: {
+                            family: 0,
                             host: 'localhost',
                             port: 6379,
                             maxRetriesPerRequest: null,
