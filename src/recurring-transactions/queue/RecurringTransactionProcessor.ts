@@ -5,6 +5,8 @@ import {Logger} from "@nestjs/common";
 import {RecurringTransactionsService} from "../recurring-transactions.service";
 import {ExpenseResponse} from "../../expenses/interfaces/expense.interface";
 import {RecurringTransactionQueue} from "./recurring-transaction.queue";
+import {EventEmitter2} from "@nestjs/event-emitter";
+import {EVENTS} from "../../common/constants/events.constants";
 
 
 @Processor(QUEUE_NAMES.RECURRING_TRANSACTIONS)
@@ -13,7 +15,10 @@ export class RecurringTransactionProcessor extends WorkerHost {
     private logger = new Logger(RecurringTransactionProcessor.name);
 
     constructor(private readonly recurringTransactionService: RecurringTransactionsService,
-                private readonly queue: RecurringTransactionQueue) {
+                private readonly queue: RecurringTransactionQueue,
+                private readonly emitter: EventEmitter2
+    ) {
+
         super();
     }
 
@@ -37,7 +42,10 @@ export class RecurringTransactionProcessor extends WorkerHost {
 
             for (const transaction of dueTransactions) {
                 await this.queue.processRecurringTransaction(transaction.recurring_id)
+                this.emitter.emit(EVENTS.RECURRING_EXPENSE.EXECUTED, transaction)
             }
+
+
             return {
                 success: true,
                 dueTransaction: dueTransactions,
@@ -54,10 +62,11 @@ export class RecurringTransactionProcessor extends WorkerHost {
         const {recurringId} = job.data;
 
         try {
-            await this.recurringTransactionService.processRecurring(recurringId);
+            const expense = await this.recurringTransactionService.processRecurring(recurringId);
 
-            //TODO: add notification to user about processed transaction
             this.logger.log(`Successfully processed recurring transaction with id: ${recurringId}`);
+            this.emitter.emit(EVENTS.EXPENSE.CREATED, expense)
+
             return {
                 success: true,
                 recurringId: recurringId,

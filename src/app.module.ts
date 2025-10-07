@@ -19,15 +19,13 @@ import {RecurringTransactionLogsModule} from './recurring_transaction_logs/recur
 import {InvalidatedTokensModule} from './invalidated-tokens/invalidated-tokens.module';
 import {SavingsGoalsModule} from './savings-goals/savings-goals.module';
 import {WalletsModule} from './wallets/wallets.module';
-import {QUEUE_NAMES, JOB_NAMES} from "../queue-constants";
+import {QUEUE_NAMES} from "../queue-constants";
 import {BullBoardModule} from "@bull-board/nestjs";
 import {ExpressAdapter} from "@bull-board/express";
 import {BullMQAdapter} from "@bull-board/api/bullMQAdapter";
 import {AdminModule} from './admin/admin.module';
-import { ExpenseGateway } from './expense-gateway/expense.gateway';
-import { ExpenseGatewayModuleModule } from './expense-gateway/expense-gateway.module/expense-gateway.module.module';
-import { ExpenseGatewayModule } from './expense-gateway/expense-gateway.module';
-
+import {ExpenseGatewayModule} from './expense-gateway/expense-gateway.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 @Module({
     imports: [ConfigModule.forRoot({
         isGlobal: true,
@@ -67,6 +65,16 @@ import { ExpenseGatewayModule } from './expense-gateway/expense-gateway.module';
             name: QUEUE_NAMES.RECURRING_TRANSACTIONS,
             adapter: BullMQAdapter, // ⚠️ Quan trọng: dùng BullMQAdapter
         }),
+        EventEmitterModule.forRoot({
+            wildcard: true,           // nên bật để dễ nhóm event theo namespace: "user.*"
+            delimiter: '.',           // giữ mặc định
+            newListener: false,        // tắt, không cần nếu không debug
+            removeListener: false,     // tắt, hiếm khi cần
+            maxListeners: 20,          // tăng nhẹ giới hạn an toàn
+            verboseMemoryLeak: true,   // nên bật trong môi trường dev để dễ phát hiện rò rỉ
+            ignoreErrors: false,
+        })
+        ,
         UserModule,
         PrismaModule,
         AuthModule,
@@ -80,11 +88,10 @@ import { ExpenseGatewayModule } from './expense-gateway/expense-gateway.module';
         SavingsGoalsModule,
         WalletsModule,
         AdminModule,
-        ExpenseGatewayModuleModule,
-        ExpenseGatewayModule
+        ExpenseGatewayModule,
     ],
     controllers: [AppController],
-    providers: [AppService, ExpenseGateway],
+    providers: [AppService],
 })
 export class AppModule {
 }

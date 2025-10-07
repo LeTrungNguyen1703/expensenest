@@ -6,6 +6,7 @@ import {PrismaClientKnownRequestError} from '@prisma/client/runtime/library';
 import {RecurringTransaction, RecurringTransactionResponse} from './interfaces/recurring-transaction.interface';
 import {transaction_type_enum, frequency_enum} from '@prisma/client';
 import {RecurringTransactionQueue} from "./queue/recurring-transaction.queue";
+import {ExpenseResponse} from "../expenses/interfaces/expense.interface";
 
 @Injectable()
 export class RecurringTransactionsService {
@@ -272,19 +273,24 @@ export class RecurringTransactionsService {
     /**
      * Xử lý một recurring transaction cụ thể
      */
-    async processRecurring(recurringId: number): Promise<void> {
+    async processRecurring(recurringId: number):Promise<ExpenseResponse| null> {
         const recurring = await this.prisma.recurring_transactions.findUnique({
             where: {recurring_id: recurringId},
         });
 
-        if (!recurring || !recurring.is_active) {
-            return;
+        if (!recurring) {
+            throw new NotFoundException(`Active recurring transaction with ID ${recurringId} not found`);
         }
+        if (!recurring.is_active) {
+            return null; // Không làm gì nếu không active
+        }
+        let expense: ExpenseResponse | null = null;
 
-        await this.prisma.$transaction(async (tx) => {
+        expense = await this.prisma.$transaction(async (tx) => {
+            let createExpense: ExpenseResponse | null = null;
             // 1. Tạo expense nếu auto_create = true
             if (recurring.auto_create) {
-                const expense = await tx.expenses.create({
+                createExpense  = await tx.expenses.create({
                     data: {
                         user_id: recurring.user_id,
                         title: recurring.title,
@@ -297,6 +303,7 @@ export class RecurringTransactionsService {
                         // Liên kết với recurring transaction
                         recurring_transaction_id: recurring.recurring_id,
                     },
+
                 });
 
                 this.logger.log(`✅ Created expense #${expense} from recurring #${recurringId}`);
@@ -332,6 +339,9 @@ export class RecurringTransactionsService {
             // // TODO: Implement notification service
             // this.logger.log(`📩 Should send reminder for recurring #${recurringId}`);
             // await this.queue.processNotificationRecurringAfterCreateExpense()
+            return createExpense;
         });
+
+        return expense;
     }
 }

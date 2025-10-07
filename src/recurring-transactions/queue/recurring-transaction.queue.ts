@@ -30,7 +30,7 @@ export class RecurringTransactionQueue implements OnModuleInit {
             {},
             {
                 repeat: {
-                    pattern: '6 1 * * *',
+                    pattern: '34 11 * * *',
                 },
                 jobId: 'daily-recurring-check',
             },
@@ -43,20 +43,6 @@ export class RecurringTransactionQueue implements OnModuleInit {
         await this.queue.add(
             JOB_NAMES.PROCESS_SINGLE_RECURRING,
             {recurringId},
-            {
-                attempts: 3, // Retry 3 lần nếu fail
-                backoff: {
-                    type: 'exponential',
-                    delay: 5000, // 5s, 10s, 20s
-                },
-            },
-        );
-    }
-
-    async processNotificationRecurringAfterCreateExpense() {
-        await this.queue.add(
-            JOB_NAMES.NOTIFICATION_RECURRING_AFTER_CREATE_EXPENSE,
-            {},
             {
                 attempts: 3, // Retry 3 lần nếu fail
                 backoff: {
