@@ -55,12 +55,18 @@ import {QUEUE_NAMES} from "./queue-constants";
                 }
                 try {
                     console.log('[Cache] Connecting to Redis:', redisUrl.replace(/:[^:@]+@/, ':***@')); // Hide password in logs
+
+                    // Add family=0 for dual stack DNS lookup (fixes Railway redis.railway.internal)
+                    const redisUrlWithFamily = redisUrl.includes('?')
+                        ? `${redisUrl}&family=0`
+                        : `${redisUrl}?family=0`;
+
                     return {
                         stores: [
                             new Keyv({
                                 store: new CacheableMemory({ttl: 60000, lruSize: 5000}),
                             }),
-                            new KeyvRedis(redisUrl),
+                            new KeyvRedis(redisUrlWithFamily),
                         ],
                     };
                 } catch (error) {
@@ -88,7 +94,7 @@ import {QUEUE_NAMES} from "./queue-constants";
                     // Return a default config - BullMQ will fail gracefully if Redis is not available
                     return {
                         connection: {
-                            family: 0,
+                            family: 0, // Enable dual stack DNS lookup
                             host: 'localhost',
                             port: 6379,
                             maxRetriesPerRequest: null,
@@ -106,9 +112,17 @@ import {QUEUE_NAMES} from "./queue-constants";
                 }
 
                 console.log('[BullMQ] Connecting to Redis:', redisUrl.replace(/:[^:@]+@/, ':***@')); // Hide password in logs
+
+                // Parse Redis URL and add family: 0 for dual stack DNS lookup
+                const parsedUrl = new URL(redisUrl);
+
                 return {
                     connection: {
-                        url: redisUrl,
+                        family: 0, // Enable dual stack DNS lookup (fixes Railway redis.railway.internal)
+                        host: parsedUrl.hostname,
+                        port: parsedUrl.port ? parseInt(parsedUrl.port) : 6379,
+                        username: parsedUrl.username || undefined,
+                        password: parsedUrl.password || undefined,
                         maxRetriesPerRequest: null,
                         enableReadyCheck: false,
                         retryStrategy: (times) => {
