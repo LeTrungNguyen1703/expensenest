@@ -37,11 +37,14 @@ import {QUEUE_NAMES} from "./queue-constants";
             isGlobal: true,
             inject: [ConfigService],
             useFactory: async (config: ConfigService) => {
-                const redisUrl = config.get<string | undefined>('REDIS_URL');
+                // Railway provides REDIS_PRIVATE_URL for internal connections
+                // Fallback to REDIS_URL for local/public connections
+                const redisUrl = config.get<string | undefined>('REDIS_PRIVATE_URL')
+                    || config.get<string | undefined>('REDIS_URL');
 
                 // Fallback to memory-only cache if Redis is not available
                 if (!redisUrl) {
-                    console.warn('[Cache] REDIS_URL not set. Using memory-only cache.');
+                    console.warn('[Cache] No Redis URL configured. Using memory-only cache.');
                     return {
                         stores: [
                             new Keyv({
@@ -51,7 +54,7 @@ import {QUEUE_NAMES} from "./queue-constants";
                     };
                 }
                 try {
-                    console.log('[Cache] Connecting to Redis...');
+                    console.log('[Cache] Connecting to Redis:', redisUrl.replace(/:[^:@]+@/, ':***@')); // Hide password in logs
                     return {
                         stores: [
                             new Keyv({
@@ -75,10 +78,13 @@ import {QUEUE_NAMES} from "./queue-constants";
         BullModule.forRootAsync({
             inject: [ConfigService],
             useFactory: async (config: ConfigService) => {
-                const redisUrl = config.get<string | undefined>('REDIS_URL');
+                // Railway provides REDIS_PRIVATE_URL for internal connections
+                // Fallback to REDIS_URL for local/public connections
+                const redisUrl = config.get<string | undefined>('REDIS_PRIVATE_URL')
+                    || config.get<string | undefined>('REDIS_URL');
 
                 if (!redisUrl) {
-                    console.warn('[BullMQ] REDIS_URL not set. Queue functionality will be limited.');
+                    console.warn('[BullMQ] No Redis URL configured. Queue functionality will be limited.');
                     // Return a default config - BullMQ will fail gracefully if Redis is not available
                     return {
                         connection: {
@@ -98,7 +104,7 @@ import {QUEUE_NAMES} from "./queue-constants";
                     };
                 }
 
-                console.log('[BullMQ] Connecting to Redis...');
+                console.log('[BullMQ] Connecting to Redis:', redisUrl.replace(/:[^:@]+@/, ':***@')); // Hide password in logs
                 return {
                     connection: {
                         url: redisUrl,
