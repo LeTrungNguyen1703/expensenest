@@ -1,7 +1,7 @@
 import {Inject, Injectable, Logger, OnModuleInit} from "@nestjs/common";
-import {JOB_NAMES, QUEUE_NAMES} from "../../../queue-constants";
 import {Queue} from "bullmq";
 import {InjectQueue} from "@nestjs/bullmq";
+import {JOB_NAMES, QUEUE_NAMES} from "../../queue-constants";
 
 
 @Injectable()

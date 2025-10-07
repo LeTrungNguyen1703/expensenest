@@ -1,5 +1,4 @@
 import {Processor, WorkerHost} from "@nestjs/bullmq";
-import {QUEUE_NAMES, JOB_NAMES} from "../../../queue-constants";
 import {Job} from "bullmq";
 import {Logger} from "@nestjs/common";
 import {RecurringTransactionsService} from "../recurring-transactions.service";
@@ -7,6 +6,7 @@ import {ExpenseResponse} from "../../expenses/interfaces/expense.interface";
 import {RecurringTransactionQueue} from "./recurring-transaction.queue";
 import {EventEmitter2} from "@nestjs/event-emitter";
 import {EVENTS} from "../../common/constants/events.constants";
+import {JOB_NAMES, QUEUE_NAMES} from "../../queue-constants";
 
 
 @Processor(QUEUE_NAMES.RECURRING_TRANSACTIONS)

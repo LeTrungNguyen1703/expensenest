@@ -5,7 +5,7 @@ import {Queue} from 'bullmq';
 import {createBullBoard} from '@bull-board/api';
 import {BullMQAdapter} from '@bull-board/api/bullMQAdapter';
 import {ExpressAdapter} from '@bull-board/express';
-import {QUEUE_NAMES} from "../../queue-constants";
+import {QUEUE_NAMES} from "../queue-constants";
 
 @Controller('admin/queues')
 // @UseGuards(JwtAuthGuard, AdminGuard) // ✅ Uncomment để thêm auth

@@ -19,7 +19,6 @@ import {RecurringTransactionLogsModule} from './recurring_transaction_logs/recur
 import {InvalidatedTokensModule} from './invalidated-tokens/invalidated-tokens.module';
 import {SavingsGoalsModule} from './savings-goals/savings-goals.module';
 import {WalletsModule} from './wallets/wallets.module';
-import {QUEUE_NAMES} from "../queue-constants";
 import {BullBoardModule} from "@bull-board/nestjs";
 import {ExpressAdapter} from "@bull-board/express";
 import {BullMQAdapter} from "@bull-board/api/bullMQAdapter";
@@ -27,6 +26,7 @@ import {AdminModule} from './admin/admin.module';
 import {ExpenseGatewayModule} from './expense-gateway/expense-gateway.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AblyModule } from './ably/ably.module';
+import {QUEUE_NAMES} from "./queue-constants";
 @Module({
     imports: [ConfigModule.forRoot({
         isGlobal: true,
