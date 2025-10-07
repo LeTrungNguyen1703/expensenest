@@ -1,32 +1,36 @@
-# Multi-stage Dockerfile for building and running the NestJS + Prisma app (suitable for Railway)
-# Builder stage: install dev deps, generate prisma client, build TypeScript
+# ===============================
+# 🚧 Builder stage
+# ===============================
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Install build deps
+# Copy package metadata trước để tối ưu cache
 COPY package*.json ./
-COPY package-lock.json ./
 RUN npm ci --silent
 
-# Copy source files
+# Copy Prisma và source code
 COPY prisma ./prisma
-COPY tsconfig*.json ./
-COPY nest-cli.json ./
+COPY tsconfig*.json nest-cli.json ./
 COPY src ./src
 
-# Build (this will run `prisma generate` as defined in package.json build script)
+# ✅ Nhận DATABASE_URL từ Railway (cần cho `prisma generate`)
+ARG DATABASE_URL
+ENV DATABASE_URL=${DATABASE_URL}
+
+# Build (chạy prisma generate + nest build)
 RUN npm run build --silent
 
-# Runtime stage: copy only what is needed to run the app
+# ===============================
+# 🚀 Runner stage
+# ===============================
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Copy package files for metadata (not strictly required but helpful)
+# Copy metadata
 COPY package*.json ./
 
-# Copy production-ready artifacts from builder
-# Include node_modules to preserve generated Prisma client and installed production deps
+# Copy artifacts từ builder stage
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
@@ -35,8 +39,8 @@ COPY --from=builder /app/prisma ./prisma
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
-# Expose port (the app reads PORT env var; Railway sets PORT automatically)
+# Expose port (Railway sẽ tự inject PORT env var)
 EXPOSE 3000
 
-# Use entrypoint to run migrations then start the compiled Nest application
+# Run migrations rồi khởi động app
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
