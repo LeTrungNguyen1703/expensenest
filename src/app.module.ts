@@ -26,6 +26,7 @@ import {BullMQAdapter} from "@bull-board/api/bullMQAdapter";
 import {AdminModule} from './admin/admin.module';
 import {ExpenseGatewayModule} from './expense-gateway/expense-gateway.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { AblyModule } from './ably/ably.module';
 @Module({
     imports: [ConfigModule.forRoot({
         isGlobal: true,
@@ -89,6 +90,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
         WalletsModule,
         AdminModule,
         ExpenseGatewayModule,
+        AblyModule,
     ],
     controllers: [AppController],
     providers: [AppService],

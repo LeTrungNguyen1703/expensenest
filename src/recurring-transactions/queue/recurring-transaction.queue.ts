@@ -30,7 +30,7 @@ export class RecurringTransactionQueue implements OnModuleInit {
             {},
             {
                 repeat: {
-                    pattern: '34 11 * * *',
+                    pattern: '39 15 * * *',
                 },
                 jobId: 'daily-recurring-check',
             },
