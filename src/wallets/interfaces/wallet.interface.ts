@@ -31,7 +31,7 @@ export class WalletResponse {
   @Expose()
   created_at: Date | null;
 
-  @ApiProperty({ nullable: true, required: false })
+  @ApiProperty({ nullable: true })
   @Expose()
-  updated_at?: Date | null;
+  updated_at: Date | null;
 }

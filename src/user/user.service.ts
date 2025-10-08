@@ -1,10 +1,12 @@
-import {Injectable, ConflictException, NotFoundException} from '@nestjs/common';
+import {Injectable, ConflictException, NotFoundException, BadRequestException} from '@nestjs/common';
 import {CreateUserDto} from './dto/create-user.dto';
 import {UpdateUserDto} from './dto/update-user.dto';
 import {PrismaService} from "../prisma/prisma.service";
 import {PrismaClientKnownRequestError} from "@prisma/client/runtime/library";
 import * as bcrypt from 'bcrypt';
 import {User, UserResponse} from './interfaces/user.interface';
+import {PrismaPagination} from '../common/helpers/prisma-pagination.helper';
+import {PaginatedResponse} from '../common/interfaces/paginated-response.interface';
 
 @Injectable()
 export class UserService {
@@ -45,18 +47,30 @@ export class UserService {
         }
     }
 
-    async findAll(): Promise<UserResponse[]> {
-        return this.prisma.users.findMany({
-            select: {
-                user_id: true,
-                username: true,
-                email: true,
-                full_name: true,
-                created_at: true,
-                updated_at: true,
-                is_active: true,
-            },
-        });
+    /**
+     * Paginated list of users (admin)
+     */
+    async findAll(page = 1, limit = 10): Promise<PaginatedResponse<UserResponse>> {
+        // Select only public fields (exclude password_hash)
+        const select = {
+            user_id: true,
+            username: true,
+            email: true,
+            full_name: true,
+            created_at: true,
+            updated_at: true,
+            is_active: true,
+        };
+
+        return PrismaPagination.paginate<UserResponse>(
+            this.prisma.users,
+            page,
+            limit,
+            undefined,
+            { created_at: 'desc' },
+            undefined,
+            select,
+        );
     }
 
     async findOne(id: number): Promise<UserResponse> {
@@ -80,8 +94,14 @@ export class UserService {
         return user;
     }
 
-    async update(id: number, updateUserDto: UpdateUserDto): Promise<UserResponse> {
+    /**
+     * Update user with ownership verification (only the owner can update their profile)
+     */
+    async update(id: number, updateUserDto: UpdateUserDto, userId: number): Promise<UserResponse> {
         const {password, ...updateData} = updateUserDto;
+
+        // Verify ownership
+        await this.verifyOwnership(id, userId);
 
         // If password is provided, hash it
         let dataToUpdate: any = {...updateData};
@@ -121,7 +141,13 @@ export class UserService {
         }
     }
 
-    async remove(id: number): Promise<{ message: string; user: Partial<UserResponse> }> {
+    /**
+     * Remove user with ownership verification
+     */
+    async remove(id: number, userId: number): Promise<{ message: string; user: Partial<UserResponse> }> {
+        // Verify ownership
+        await this.verifyOwnership(id, userId);
+
         try {
             const deletedUser = await this.prisma.users.delete({
                 where: {user_id: id},
@@ -166,5 +192,23 @@ export class UserService {
         }
 
         return user;
+    }
+
+    /**
+     * Helper to verify that JWT userId owns the resource
+     */
+    private async verifyOwnership(targetUserId: number, jwtUserId: number) {
+        const existing = await this.prisma.users.findUnique({
+            where: {user_id: targetUserId},
+            select: {user_id: true},
+        });
+
+        if (!existing) {
+            throw new NotFoundException(`User with ID ${targetUserId} not found`);
+        }
+
+        if (existing.user_id !== jwtUserId) {
+            throw new BadRequestException('You do not have permission to modify this user');
+        }
     }
 }

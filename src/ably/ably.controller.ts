@@ -3,6 +3,7 @@ import {JwtAuthGuard} from '../auth/jwt-auth.guard';
 import * as Ably from 'ably';
 import {TokenParams} from 'ably';
 import {ABLY_CLIENT} from "./constant.ably";
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @Controller('ably')
 export class AblyController {
@@ -17,6 +18,8 @@ export class AblyController {
      */
     @Post('auth')
     @UseGuards(JwtAuthGuard) // Require authentication
+    @ApiBearerAuth('access-token')
+    @ApiOperation({ summary: 'Create Ably token request for authenticated user' })
     async createToken(@Req() req: any) {
         const userId = req.user.userId; // From JWT payload
 

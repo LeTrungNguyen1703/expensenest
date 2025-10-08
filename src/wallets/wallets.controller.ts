@@ -10,7 +10,8 @@ import {
     ParseIntPipe,
     HttpCode,
     HttpStatus,
-    Request
+    Request,
+    Query,
 } from '@nestjs/common';
 import {WalletsService} from './wallets.service';
 import {CreateWalletDto} from './dto/create-wallet.dto';
@@ -19,6 +20,8 @@ import {UpdateBalanceDto} from './dto/update-balance.dto';
 import {JwtAuthGuard} from '../auth/jwt-auth.guard';
 import {ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth} from '@nestjs/swagger';
 import {WalletResponse} from './interfaces/wallet.interface';
+import {PaginationDto} from '../common/dto/pagination.dto';
+import {PaginatedResponse} from '../common/interfaces/paginated-response.interface';
 
 @ApiTags('wallets')
 @Controller('wallets')
@@ -34,24 +37,29 @@ export class WalletsController {
     @ApiBody({type: CreateWalletDto, description: 'Wallet creation data'})
     @ApiBearerAuth('access-token')
     @HttpCode(HttpStatus.CREATED)
-    async create(@Body() createWalletDto: CreateWalletDto): Promise<WalletResponse> {
-        return this.walletsService.create(createWalletDto);
+    async create(@Body() createWalletDto: CreateWalletDto, @Request() req): Promise<WalletResponse> {
+        return this.walletsService.create(createWalletDto, req.user.userId);
     }
 
     @Get()
     @ApiBearerAuth('access-token')
-    @ApiOperation({summary: 'Get all wallets'})
-    @ApiResponse({status: 200, description: 'Returns all wallets', type: [WalletResponse]})
-    async findAll(): Promise<WalletResponse[]> {
-        return this.walletsService.findAll();
+    @ApiOperation({summary: 'Get all wallets with pagination'})
+    @ApiResponse({status: 200, description: 'Returns paginated wallets'})
+    async findAll(
+        @Query() paginationDto: PaginationDto,
+    ): Promise<PaginatedResponse<WalletResponse>> {
+        return this.walletsService.findAll(paginationDto.page, paginationDto.limit);
     }
 
     @Get('user')
     @ApiBearerAuth('access-token')
-    @ApiOperation({summary: 'Get all wallets for the authenticated user'})
-    @ApiResponse({status: 200, description: 'Returns all wallets for the user', type: [WalletResponse]})
-    async findByUserId(@Request() req): Promise<WalletResponse[]> {
-        return this.walletsService.findByUserId(req.user.userId);
+    @ApiOperation({summary: 'Get all wallets for the authenticated user with pagination'})
+    @ApiResponse({status: 200, description: 'Returns paginated wallets for the user'})
+    async findByUserId(
+        @Request() req,
+        @Query() paginationDto: PaginationDto,
+    ): Promise<PaginatedResponse<WalletResponse>> {
+        return this.walletsService.findByUserId(req.user.userId, paginationDto.page, paginationDto.limit);
     }
 
     @Get(':id')
@@ -73,9 +81,10 @@ export class WalletsController {
     @ApiResponse({status: 404, description: 'Wallet not found'})
     async update(
         @Param('id', ParseIntPipe) id: number,
-        @Body() updateWalletDto: UpdateWalletDto
+        @Body() updateWalletDto: UpdateWalletDto,
+        @Request() req,
     ): Promise<WalletResponse> {
-        return this.walletsService.update(id, updateWalletDto);
+        return this.walletsService.update(id, updateWalletDto, req.user.userId);
     }
 
     @Patch(':id/balance')
@@ -87,9 +96,10 @@ export class WalletsController {
     @ApiResponse({status: 404, description: 'Wallet not found'})
     async updateBalance(
         @Param('id', ParseIntPipe) id: number,
-        @Body() updateBalanceDto: UpdateBalanceDto
+        @Body() updateBalanceDto: UpdateBalanceDto,
+        @Request() req,
     ): Promise<WalletResponse> {
-        return this.walletsService.updateBalance(id, updateBalanceDto.amount);
+        return this.walletsService.updateBalance(id, updateBalanceDto.amount, req.user.userId);
     }
 
     @Delete(':id')
@@ -99,7 +109,10 @@ export class WalletsController {
     @ApiResponse({status: 200, description: 'Wallet successfully deleted'})
     @ApiResponse({status: 404, description: 'Wallet not found'})
     @HttpCode(HttpStatus.OK)
-    async remove(@Param('id', ParseIntPipe) id: number): Promise<{ message: string; wallet: Partial<WalletResponse> }> {
-        return this.walletsService.remove(id);
+    async remove(
+        @Param('id', ParseIntPipe) id: number,
+        @Request() req,
+    ): Promise<{ message: string; wallet: Partial<WalletResponse> }> {
+        return this.walletsService.remove(id, req.user.userId);
     }
 }

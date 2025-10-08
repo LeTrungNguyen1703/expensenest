@@ -12,9 +12,4 @@ export class CreateWalletDto {
   @IsInt()
   @Min(0)
   balance?: number;
-
-  @ApiProperty({ example: 1, description: 'User ID who owns the wallet' })
-  @IsNotEmpty()
-  @IsInt()
-  user_id: number;
 }

@@ -6,23 +6,38 @@
 - ✅ All endpoints must be protected with `@UseGuards(JwtAuthGuard)`
 - ✅ **NEVER take userId from URL parameter** - always extract from JWT token: `req.user.userId`
 - ✅ Verify ownership for update/delete operations
-- ✅ Add `@ApiBearerAuth('access-token')` to all protected endpoints
+- ✅ Add `@ApiBearerAuth('access-token')` to each protected method (even if the guard is applied at the controller/class level). This ensures Swagger documents the authentication requirement per-operation.
+
+  ```typescript
+  // Controller-level guard (still add per-method ApiBearerAuth)
+  @Controller('wallets')
+  @UseGuards(JwtAuthGuard)
+  export class WalletsController {
+    @Get()
+    @ApiBearerAuth('access-token') // REQUIRED: annotate each protected method
+    async findAll() { /* ... */ }
+
+    @Post()
+    @ApiBearerAuth('access-token') // REQUIRED
+    async create() { /* ... */ }
+  }
+  ```
 
 ### 2. **Response Type Classes (NOT Interfaces)**
 - ✅ Create Response class with `@Expose()` and `@ApiProperty()` decorators (DO NOT use interface for Response)
 - ✅ Use `| null` instead of `?:` optional for nullable database fields
 - ✅ Pattern:
-```typescript
-export class EntityResponse {
-  @ApiProperty()
-  @Expose()
-  field_name: type;
+  ```typescript
+  export class EntityResponse {
+    @ApiProperty()
+    @Expose()
+    field_name: type;
 
-  @ApiProperty({ nullable: true })
-  @Expose()
-  nullable_field: type | null;
-}
-```
+    @ApiProperty({ nullable: true })
+    @Expose()
+    nullable_field: type | null;
+  }
+  ```
 
 ### 3. **DTO Structure**
 - ✅ CreateDto: Full validation with `class-validator` decorators
@@ -33,86 +48,129 @@ export class EntityResponse {
 ### 4. **Service Layer**
 - ✅ **Always receive userId from JWT**, not from DTO or URL
 - ✅ Signature pattern: `async create(createDto: CreateDto, userId: number): Promise<EntityResponse>`
-- ✅ **Use object destructuring in create method** to handle special fields cleanly:
-```typescript
-// ✅ PREFER: Clean approach using destructuring
-async create(createDto: CreateDto, userId: number): Promise<EntityResponse> {
-  const { dateField, specialField, ...otherFields } = createDto;
-  
-  return await this.prisma.entities.create({
-    data: {
-      user_id: userId,
-      ...otherFields,  // Spread all regular fields
-      dateField: new Date(dateField),  // Handle date conversion
-      specialField: specialField ?? defaultValue,  // Handle defaults
-    },
-  });
-}
-```
-- ✅ **DO NOT use verbose select statements** - Prisma returns all fields by default which matches your Response class:
-```typescript
-// ❌ AVOID: Verbose select with all fields listed
-return await this.prisma.entities.findMany({
-  select: {
-    field1: true,
-    field2: true,
-    field3: true,
-    // ... 15 more fields
+- ✅ **Use PrismaPagination helper for list endpoints** instead of manual skip/take:
+  ```typescript
+  // ✅ PREFER: Use PrismaPagination helper
+  async findAll(page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+    return PrismaPagination.paginate<EntityResponse>(
+      this.prisma.entities,
+      page,
+      limit,
+      undefined,
+      { created_at: 'desc' }
+    );
   }
-});
 
-// ✅ PREFER: Let Prisma return all fields (matches Response class)
-return await this.prisma.entities.findMany({
-  where: { user_id: userId },
-  orderBy: { created_at: 'desc' }
-});
-```
+  async findByUserId(userId: number, page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+    return PrismaPagination.paginate<EntityResponse>(
+      this.prisma.entities,
+      page,
+      limit,
+      { user_id: userId },
+      { created_at: 'desc' }
+    );
+  }
+  ```
+- ✅ **Use object destructuring in create method** to handle special fields cleanly:
+  ```typescript
+  // ✅ PREFER: Clean approach using destructuring
+  async create(createDto: CreateDto, userId: number): Promise<EntityResponse> {
+    const { dateField, specialField, ...otherFields } = createDto;
+
+    return await this.prisma.entities.create({
+      data: {
+        user_id: userId,
+        ...otherFields,  // Spread all regular fields
+        dateField: new Date(dateField),  // Handle date conversion
+        specialField: specialField ?? defaultValue,  // Handle defaults
+      },
+    });
+  }
+  ```
+- ✅ **DO NOT use verbose select statements** - Prisma returns all fields by default which matches your Response class:
+  ```typescript
+  // ❌ AVOID: Verbose select with all fields listed
+  return await this.prisma.entities.findMany({
+    select: {
+      field1: true,
+      field2: true,
+      field3: true,
+      // ... 15 more fields
+    }
+  });
+
+  // ✅ PREFER: Let Prisma return all fields (matches Response class)
+  return await this.prisma.entities.findMany({
+    where: { user_id: userId },
+    orderBy: { created_at: 'desc' }
+  });
+  ```
 - ✅ **Only use select when**:
   - Fetching data for ownership verification (only need user_id)
   - Excluding sensitive fields (like password_hash)
   - Returning partial data in delete operations
-```typescript
-// ✅ GOOD: Select only needed fields for verification
-const existing = await this.prisma.entity.findUnique({
-  where: { id },
-  select: { user_id: true, other_needed_field: true }
-});
-```
-- ✅ Verify ownership before update/delete:
-```typescript
-const existing = await this.prisma.entity.findUnique({
-  where: { id },
-  select: { user_id: true }
-});
-if (!existing) throw new NotFoundException();
-if (existing.user_id !== userId) throw new BadRequestException('No permission');
-```
+  ```typescript
+  // ✅ GOOD: Select only needed fields for verification
+  const existing = await this.prisma.entity.findUnique({
+    where: { id },
+    select: { user_id: true, other_needed_field: true }
+  });
+  ```
+- ✅ **Create a private verifyOwnership helper method** to reduce code duplication:
+  ```typescript
+  private async verifyOwnership(entityId: number, userId: number): Promise<void> {
+    const existing = await this.prisma.entity.findUnique({
+      where: { entity_id: entityId },
+      select: { user_id: true },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Entity with ID ${entityId} not found`);
+    }
+
+    if (existing.user_id !== userId) {
+      throw new BadRequestException('You do not have permission to modify this entity');
+    }
+  }
+  ```
+- ✅ Use the helper method in update/delete/custom operations:
+  ```typescript
+  async update(id: number, dto: UpdateDto, userId: number): Promise<EntityResponse> {
+    await this.verifyOwnership(id, userId);
+    // Proceed with update...
+  }
+
+  async remove(id: number, userId: number): Promise<any> {
+    await this.verifyOwnership(id, userId);
+    // Proceed with delete...
+  }
+  ```
 - ✅ **Use object destructuring and spread operator in update method** to avoid verbose field-by-field checks:
-```typescript
-// ❌ AVOID: Verbose approach
-const dataToUpdate: any = {};
-if (dto.field1 !== undefined) dataToUpdate.field1 = dto.field1;
-if (dto.field2 !== undefined) dataToUpdate.field2 = dto.field2;
-// ... repeat for every field
+  ```typescript
+  // ❌ AVOID: Verbose approach
+  const dataToUpdate: any = {};
+  if (dto.field1 !== undefined) dataToUpdate.field1 = dto.field1;
+  if (dto.field2 !== undefined) dataToUpdate.field2 = dto.field2;
+  // ... repeat for every field
 
-// ✅ PREFER: Clean approach using destructuring
-const { specialField1, specialField2, ...otherUpdates } = updateDto;
-const dataToUpdate: any = {
-  ...otherUpdates,  // Spread all other fields automatically
-  updated_at: new Date(),
-};
+  // ✅ PREFER: Clean approach using destructuring
+  const { specialField1, specialField2, ...otherUpdates } = updateDto;
+  const dataToUpdate: any = {
+    ...otherUpdates,  // Spread all other fields automatically
+    updated_at: new Date(),
+  };
 
-// Handle special fields separately (dates, calculations, etc.)
-if (specialField1 !== undefined) {
-  dataToUpdate.specialField1 = new Date(specialField1);
-}
+  // Handle special fields separately (dates, calculations, etc.)
+  if (specialField1 !== undefined) {
+    dataToUpdate.specialField1 = new Date(specialField1);
+  }
 
-// Return without verbose select
-return await this.prisma.entity.update({
-  where: { id },
-  data: dataToUpdate,
-});
-```
+  // Return without verbose select
+  return await this.prisma.entity.update({
+    where: { id },
+    data: dataToUpdate,
+  });
+  ```
 - ✅ Error handling with `PrismaClientKnownRequestError`:
   - P2002: Unique constraint violation
   - P2003: Foreign key constraint violation
@@ -122,12 +180,60 @@ return await this.prisma.entity.update({
   - `findAll()` - admin view (no select needed)
   - `findOne(id)` - single record (no select needed)
   - `findByUserId(userId)` - user's own records (no select needed)
-  - `update(id, dto, userId)` - with ownership check and clean spread syntax (no select needed)
-  - `remove(id, userId)` - with ownership check (select only needed fields for response)
+  - `update(id, dto, userId)` - with ownership check using verifyOwnership helper (no select needed)
+  - `remove(id, userId)` - with ownership check using verifyOwnership helper (select only needed fields for response)
+  - `verifyOwnership(id, userId)` - private helper method for ownership verification
   - Additional methods as needed (findByStatus, updateProgress, etc.)
+  - ✅ Pagination: For list endpoints support optional `page` and `limit` parameters (defaults: page=1, limit=10). Service signatures should accept pagination: `findAll(page = 1, limit = 10)` and `findByUserId(userId, page = 1, limit = 10)` and use Prisma's `skip` and `take`.
+
+Example service pagination pattern:
+```typescript
+async findAll(page = 1, limit = 10): Promise<EntityResponse[]> {
+  const take = limit;
+  const skip = (page - 1) * take;
+
+  return this.prisma.entities.findMany({
+    orderBy: { created_at: 'desc' },
+    skip,
+    take,
+  });
+}
+
+async findByUserId(userId: number, page = 1, limit = 10): Promise<EntityResponse[]> {
+  const take = limit;
+  const skip = (page - 1) * take;
+
+  return this.prisma.entities.findMany({
+    where: { user_id: userId },
+    orderBy: { created_at: 'desc' },
+    skip,
+    take,
+  });
+}
+```
 
 ### 5. **Controller Layer**
 - ✅ Extract userId from JWT: `@Request() req` → `req.user.userId`
+- ✅ **Use PaginationDto for list endpoints** instead of individual query parameters:
+  ```typescript
+  // ✅ PREFER: Use PaginationDto
+  @Get()
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get all entities with pagination' })
+  @ApiResponse({ status: 200, description: 'Returns paginated entities' })
+  async findAll(@Query() paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
+    return this.service.findAll(paginationDto.page, paginationDto.limit);
+  }
+
+  // ❌ AVOID: Manual query parameters
+  @Get()
+  async findAll(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+  ): Promise<EntityResponse[]> {
+    return this.service.findAll(page, limit);
+  }
+  ```
 - ✅ Endpoint pattern:
 ```typescript
 @Post()
@@ -152,6 +258,7 @@ async findMine(@Request() req): Promise<EntityResponse[]> {
   - `@ApiResponse({ status: XXX, type: EntityResponse })`
   - `@ApiParam()` for path params
   - `@ApiBody()` for request body
+  - `@ApiQuery()` for pagination parameters
 
 ### 6. **Module Configuration**
 - ✅ Export service: `exports: [EntityService]`
@@ -247,19 +354,7 @@ async findMine(@Request() req): Promise<EntityResponse[]> {
 ```typescript
 // Service
 async update(id: number, dto: UpdateDto, userId: number): Promise<EntityResponse> {
-  const existing = await this.prisma.entity.findUnique({
-    where: { entity_id: id },
-    select: { user_id: true }
-  });
-
-  if (!existing) {
-    throw new NotFoundException(`Entity with ID ${id} not found`);
-  }
-
-  if (existing.user_id !== userId) {
-    throw new BadRequestException('You do not have permission to update this entity');
-  }
-
+  await this.verifyOwnership(id, userId);
   // Proceed with update...
 }
 ```
@@ -313,6 +408,159 @@ export class EntityResponse {
 }
 ```
 
+### Pattern 5: verifyOwnership helper method (DRY principle)
+```typescript
+// Service - Private helper method to reduce code duplication
+private async verifyOwnership(entityId: number, userId: number): Promise<void> {
+  const existing = await this.prisma.entity.findUnique({
+    where: { entity_id: entityId },
+    select: { user_id: true },
+  });
+
+  if (!existing) {
+    throw new NotFoundException(`Entity with ID ${entityId} not found`);
+  }
+
+  if (existing.user_id !== userId) {
+    throw new BadRequestException('You do not have permission to modify this entity');
+  }
+}
+
+// Usage in update method
+async update(id: number, dto: UpdateDto, userId: number): Promise<EntityResponse> {
+  await this.verifyOwnership(id, userId);
+
+  const { specialField, ...otherUpdates } = dto;
+  const dataToUpdate: any = {
+    ...otherUpdates,
+    updated_at: new Date(),
+  };
+
+  return await this.prisma.entity.update({
+    where: { entity_id: id },
+    data: dataToUpdate,
+  });
+}
+
+// Usage in remove method
+async remove(id: number, userId: number): Promise<{ message: string; entity: Partial<EntityResponse> }> {
+  await this.verifyOwnership(id, userId);
+
+  const deletedEntity = await this.prisma.entity.delete({
+    where: { entity_id: id },
+    select: {
+      entity_id: true,
+      entity_name: true,
+      user_id: true,
+    },
+  });
+
+  return {
+    message: `Entity ${deletedEntity.entity_name} has been deleted`,
+    entity: deletedEntity,
+  };
+}
+
+// Usage in custom operations (e.g., updateBalance, updateProgress)
+async updateBalance(id: number, amount: number, userId: number): Promise<EntityResponse> {
+  await this.verifyOwnership(id, userId);
+
+  return await this.prisma.entity.update({
+    where: { entity_id: id },
+    data: {
+      balance: { increment: amount },
+      updated_at: new Date(),
+    },
+  });
+}
+```
+
+### Pattern 6: Pagination with PrismaPagination helper
+```typescript
+// Service - Using PrismaPagination helper for consistent pagination
+async findAll(page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+  return PrismaPagination.paginate<EntityResponse>(
+    this.prisma.entities,
+    page,
+    limit,
+    undefined,
+    { created_at: 'desc' }
+  );
+}
+
+async findByUserId(userId: number, page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+  return PrismaPagination.paginate<EntityResponse>(
+    this.prisma.entities,
+    page,
+    limit,
+    { user_id: userId },
+    { created_at: 'desc' }
+  );
+}
+
+// With complex filtering
+async findByStatus(status: string, page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+  return PrismaPagination.paginate<EntityResponse>(
+    this.prisma.entities,
+    page,
+    limit,
+    { 
+      status,
+      is_active: true 
+    },
+    { created_at: 'desc' }
+  );
+}
+
+// With relations
+async findAllWithRelations(page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+  return PrismaPagination.paginate<EntityResponse>(
+    this.prisma.entities,
+    page,
+    limit,
+    undefined,
+    { created_at: 'desc' },
+    { user: true, category: true }  // include relations
+  );
+}
+
+// Controller - Using PaginationDto
+@Get()
+@ApiBearerAuth('access-token')
+@ApiOperation({ summary: 'Get all entities with pagination' })
+@ApiResponse({ 
+  status: 200, 
+  description: 'Returns paginated entities',
+  schema: {
+    example: {
+      data: [/* array of entities */],
+      meta: {
+        total: 250,
+        page: 2,
+        limit: 10,
+        totalPages: 25,
+        hasNextPage: true,
+        hasPreviousPage: true
+      }
+    }
+  }
+})
+async findAll(@Query() paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
+  return this.service.findAll(paginationDto.page, paginationDto.limit);
+}
+
+@Get('user')
+@ApiBearerAuth('access-token')
+@ApiOperation({ summary: 'Get user entities with pagination' })
+@ApiResponse({ status: 200, description: 'Returns paginated user entities' })
+async findMine(
+  @Request() req,
+  @Query() paginationDto: PaginationDto
+): Promise<PaginatedResponse<EntityResponse>> {
+  return this.service.findByUserId(req.user.userId, paginationDto.page, paginationDto.limit);
+}
+```
+
 ---
 
 ## ❌ Common Mistakes to Avoid
@@ -343,3 +591,4 @@ export class EntityResponse {
 - [ ] No compilation errors
 - [ ] DTO validation with class-validator decorators
 - [ ] Nullable fields use `| null` not `?:`
+- [ ] Pagination support documented and implemented (page & limit query params with defaults)
