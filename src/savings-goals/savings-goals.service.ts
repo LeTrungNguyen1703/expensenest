@@ -7,12 +7,10 @@ import {SavingsGoalResponse} from './interfaces/savings-goal.interface';
 import {goal_status_enum} from '@prisma/client';
 import {PrismaPagination} from '../common/helpers/prisma-pagination.helper';
 import {PaginatedResponse} from '../common/interfaces/paginated-response.interface';
-import {EventEmitter2} from "@nestjs/event-emitter";
-import {EVENTS} from "../common/constants/events.constants";
 
 @Injectable()
 export class SavingsGoalsService {
-    constructor(private readonly prisma: PrismaService, private readonly emitter: EventEmitter2) {
+    constructor(private readonly prisma: PrismaService) {
     }
 
     async create(createSavingsGoalDto: CreateSavingsGoalDto, userId: number): Promise<SavingsGoalResponse> {
@@ -172,54 +170,14 @@ export class SavingsGoalsService {
         }
     }
 
-    async updateProgress(id: number, amount: number, userId: number): Promise<SavingsGoalResponse> {
-        // Verify ownership and fetch current/target amounts
-        const existingGoal = await this.verifyOwnership(
-            id,
-            userId,
-            {user_id: true, current_amount: true, target_amount: true},
-        );
-
-        const newAmount = (existingGoal.current_amount ?? 0) + amount;
-        const dataToUpdate: any = {
-            current_amount: newAmount,
-            updated_at: new Date(),
-        };
-
-
-        // Auto-complete if target reached
-        if (newAmount >= (existingGoal.target_amount ?? 0)) {
-            dataToUpdate.status = goal_status_enum.COMPLETED;
-            dataToUpdate.completed_at = new Date();
-
-            const dataToEmit = {
-                goal_id: existingGoal.goal_id,
-                goal_name: existingGoal.goal_name,
-                user_id: existingGoal.user_id,
-                current_amount: newAmount,
-                target_amount: existingGoal.target_amount,
-                completed_at: dataToUpdate.completed_at
-            }
-            this.emitter.emit(EVENTS.SAVINGS_GOAL.COMPLETE, {dataToEmit})
-        }
-
-        try {
-            return await this.prisma.savings_goals.update({
-                where: {goal_id: id},
-                data: dataToUpdate,
-            });
-        } catch (error) {
-            throw error;
-        }
-    }
-
     /**
      * Helper to verify ownership. Optionally return selected fields from the record.
      */
-    private async verifyOwnership(goalId: number, userId: number, select?: any): Promise<SavingsGoalResponse> {
+    private async verifyOwnership<T extends { user_id?: number }>(goalId: number, userId: number, select?: any): Promise<T & { user_id?: number }> {
         const existing = await this.prisma.savings_goals.findUnique({
             where: {goal_id: goalId},
-        })
+            select: select ?? {user_id: true},
+        }) as unknown as T & { user_id?: number };
 
         if (!existing) {
             throw new NotFoundException(`Savings goal with ID ${goalId} not found`);

@@ -7,12 +7,14 @@ import {RecurringTransaction, RecurringTransactionResponse} from './interfaces/r
 import {transaction_type_enum, frequency_enum} from '@prisma/client';
 import {RecurringTransactionQueue} from "./queue/recurring-transaction.queue";
 import {ExpenseResponse} from "../expenses/interfaces/expense.interface";
+import {RecurringTransactionLogsService} from "../recurring_transaction_logs/recurring_transaction_logs.service";
+import {CreateRecurringTransactionLogDto} from "../recurring_transaction_logs/dto/create-recurring_transaction_log.dto";
 
 @Injectable()
 export class RecurringTransactionsService {
     private logger = new Logger(RecurringTransactionsService.name);
 
-    constructor(private readonly prisma: PrismaService, private readonly queue: RecurringTransactionQueue) {
+    constructor(private readonly prisma: PrismaService) {
     }
 
     // Helper function to calculate next occurrence based on frequency
@@ -39,6 +41,24 @@ export class RecurringTransactionsService {
                 break;
         }
         return next;
+    }
+
+    /**
+     * Private helper method to verify ownership of a recurring transaction
+     */
+    private async verifyOwnership(recurringId: number, userId: number) {
+        const existing = await this.prisma.recurring_transactions.findUnique({
+            where: {recurring_id: recurringId},
+        });
+
+        if (!existing) {
+            throw new NotFoundException(`Recurring transaction with ID ${recurringId} not found`);
+        }
+
+        if (existing.user_id !== userId) {
+            throw new BadRequestException('You do not have permission to modify this recurring transaction');
+        }
+        return existing;
     }
 
     async create(createRecurringTransactionDto: CreateRecurringTransactionDto, userId: number): Promise<RecurringTransactionResponse> {
@@ -125,18 +145,7 @@ export class RecurringTransactionsService {
 
     async update(id: number, updateRecurringTransactionDto: UpdateRecurringTransactionDto, userId: number): Promise<RecurringTransactionResponse> {
         // Verify ownership
-        const existing = await this.prisma.recurring_transactions.findUnique({
-            where: {recurring_id: id},
-            select: {user_id: true, start_date: true, frequency: true},
-        });
-
-        if (!existing) {
-            throw new NotFoundException(`Recurring transaction with ID ${id} not found`);
-        }
-
-        if (existing.user_id !== userId) {
-            throw new BadRequestException('You do not have permission to update this recurring transaction');
-        }
+        const existing = await this.verifyOwnership(id, userId);
 
         // Prepare update data
         const {frequency, start_date, end_date, ...otherUpdates} = updateRecurringTransactionDto;
@@ -184,19 +193,8 @@ export class RecurringTransactionsService {
         message: string;
         transaction: Partial<RecurringTransactionResponse>
     }> {
-        // Verify ownership
-        const existing = await this.prisma.recurring_transactions.findUnique({
-            where: {recurring_id: id},
-            select: {user_id: true, title: true},
-        });
-
-        if (!existing) {
-            throw new NotFoundException(`Recurring transaction with ID ${id} not found`);
-        }
-
-        if (existing.user_id !== userId) {
-            throw new BadRequestException('You do not have permission to delete this recurring transaction');
-        }
+        // Verify ownership using helper method
+        await this.verifyOwnership(id, userId);
 
         try {
             const deleted = await this.prisma.recurring_transactions.delete({
@@ -225,18 +223,7 @@ export class RecurringTransactionsService {
 
     async toggleActive(id: number, userId: number): Promise<RecurringTransactionResponse> {
         // Verify ownership
-        const existing = await this.prisma.recurring_transactions.findUnique({
-            where: {recurring_id: id},
-            select: {user_id: true, is_active: true},
-        });
-
-        if (!existing) {
-            throw new NotFoundException(`Recurring transaction with ID ${id} not found`);
-        }
-
-        if (existing.user_id !== userId) {
-            throw new BadRequestException('You do not have permission to update this recurring transaction');
-        }
+        const existing = await this.verifyOwnership(id, userId);
 
         return this.prisma.recurring_transactions.update({
             where: {recurring_id: id},
@@ -247,6 +234,7 @@ export class RecurringTransactionsService {
         });
     }
 
+    // Method này sẽ được gọi vào một job định kỳ (cron job) hàng ngày lúc 00:01 ở RecurringTransactionQueue
     async processDueTransactions() {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -273,7 +261,7 @@ export class RecurringTransactionsService {
     /**
      * Xử lý một recurring transaction cụ thể
      */
-    async processRecurring(recurringId: number):Promise<ExpenseResponse| null> {
+    async processRecurring(recurringId: number): Promise<ExpenseResponse | null> {
         const recurring = await this.prisma.recurring_transactions.findUnique({
             where: {recurring_id: recurringId},
         });
@@ -290,7 +278,7 @@ export class RecurringTransactionsService {
             let createExpense: ExpenseResponse | null = null;
             // 1. Tạo expense nếu auto_create = true
             if (recurring.auto_create) {
-                createExpense  = await tx.expenses.create({
+                createExpense = await tx.expenses.create({
                     data: {
                         user_id: recurring.user_id,
                         title: recurring.title,
@@ -306,18 +294,19 @@ export class RecurringTransactionsService {
 
                 });
 
-                this.logger.log(`✅ Created expense #${expense} from recurring #${recurringId}`);
+                this.logger.log(`✅ Created expense #${createExpense} from recurring #${recurringId}`);
             }
             //TODO:
-            // // 2. Log lại việc xử lý
-            // await tx.recurring_transaction_logs.create({
-            //   data: {
-            //     recurring_transaction_id: recurring.recurring_id,
-            //     action: recurring.auto_create ? 'AUTO_CREATED' : 'REMINDER_SENT',
-            //     executed_at: new Date(),
-            //     status: 'SUCCESS',
-            //   },
-            // });
+            // 2. Log lại việc xử lý
+            await tx.recurring_transaction_logs.create({
+                data: {
+                    recurring_id: recurring.recurring_id,
+                    expense_id: createExpense ? createExpense.expense_id : null,
+                    scheduled_date: recurring.next_occurrence,
+                    executed_date: new Date(),
+                    status: createExpense ? 'COMPLETED' : 'SKIPPED',
+                }
+            })
 
             // 3. Tính next_occurrence mới
             const nextOccurrence = this.calculateNextOccurrence(
@@ -335,10 +324,7 @@ export class RecurringTransactionsService {
                 },
             });
 
-            // // 5. Send notification
-            // // TODO: Implement notification service
-            // this.logger.log(`📩 Should send reminder for recurring #${recurringId}`);
-            // await this.queue.processNotificationRecurringAfterCreateExpense()
+            //5: Notify được triễn khai ở RecurringTransactionProcessor
             return createExpense;
         });
 

@@ -23,6 +23,7 @@ async function bootstrap() {
         .addTag('categories', 'Category management endpoints')
         .addTag('savings-goals', 'Savings goals management endpoints')
         .addTag('recurring-transactions', 'Recurring transactions management endpoints')
+        .addTag('recurring-transaction-logs', 'Recurring transaction logs endpoints')
         .addTag('expenses', 'Expense/Income management endpoints')
         .addTag('auth', 'Authentication endpoints')
         .build();
@@ -36,6 +37,7 @@ async function bootstrap() {
         swaggerOptions: {
             tagsSorter: 'alpha',
             operationsSorter: 'alpha',
+            persistAuthorization: true,
         },
         customSiteTitle: 'Expense Manager API Docs',
     });

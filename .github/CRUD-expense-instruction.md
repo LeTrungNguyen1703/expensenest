@@ -5,7 +5,7 @@
 ### 1. **Authentication & Security**
 - ✅ All endpoints must be protected with `@UseGuards(JwtAuthGuard)`
 - ✅ **NEVER take userId from URL parameter** - always extract from JWT token: `req.user.userId`
-- ✅ Verify ownership for update/delete operations
+- ✅ Verify ownership for update/delete operations using the `verifyOwnership` helper method
 - ✅ Add `@ApiBearerAuth('access-token')` to each protected method (even if the guard is applied at the controller/class level). This ensures Swagger documents the authentication requirement per-operation.
 
   ```typescript

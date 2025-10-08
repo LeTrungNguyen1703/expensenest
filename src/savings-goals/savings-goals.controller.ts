@@ -2,7 +2,6 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntP
 import { SavingsGoalsService } from './savings-goals.service';
 import { CreateSavingsGoalDto } from './dto/create-savings-goal.dto';
 import { UpdateSavingsGoalDto } from './dto/update-savings-goal.dto';
-import { UpdateProgressDto } from './dto/update-progress.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { SavingsGoalResponse } from './interfaces/savings-goal.interface';
@@ -88,22 +87,6 @@ export class SavingsGoalsController {
     @Request() req
   ): Promise<SavingsGoalResponse> {
     return this.savingsGoalsService.update(id, updateSavingsGoalDto, req.user.userId);
-  }
-
-  @Patch(':id/progress')
-  @ApiOperation({ summary: 'Update savings goal progress (add/subtract amount)' })
-  @ApiBearerAuth('access-token')
-  @ApiParam({ name: 'id', description: 'Savings Goal ID', type: 'number' })
-  @ApiBody({ type: UpdateProgressDto, description: 'Amount to update progress' })
-  @ApiResponse({ status: 200, description: 'Progress successfully updated', type: SavingsGoalResponse })
-  @ApiResponse({ status: 404, description: 'Savings goal not found' })
-  @ApiResponse({ status: 400, description: 'You do not have permission to update this goal' })
-  async updateProgress(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateProgressDto: UpdateProgressDto,
-    @Request() req
-  ): Promise<SavingsGoalResponse> {
-    return this.savingsGoalsService.updateProgress(id, updateProgressDto.amount, req.user.userId);
   }
 
   @Delete(':id')
