@@ -12,7 +12,6 @@ export interface SavingsContribution {
     amount: number;
     contribution_date: Date;
     notes: string | null;
-    expense_id: number | null;
     user_id: number;
     created_at: Date | null;
 }

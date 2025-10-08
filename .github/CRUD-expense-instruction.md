@@ -51,26 +51,27 @@
 - ✅ **Use PrismaPagination helper for list endpoints** instead of manual skip/take:
   ```typescript
   // ✅ PREFER: Use PrismaPagination helper
-  async findAll(page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+  async findAll(paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
     return PrismaPagination.paginate<EntityResponse>(
       this.prisma.entities,
-      page,
-      limit,
+      paginationDto.page,
+      paginationDto.limit,
       undefined,
       { created_at: 'desc' }
     );
   }
 
-  async findByUserId(userId: number, page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+  async findByUserId(userId: number, paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
     return PrismaPagination.paginate<EntityResponse>(
       this.prisma.entities,
-      page,
-      limit,
+      paginationDto.page,
+      paginationDto.limit,
       { user_id: userId },
       { created_at: 'desc' }
     );
   }
   ```
+- ✅ **MUST use PaginationDto parameter** instead of individual page/limit parameters for all paginated methods
 - ✅ **Use object destructuring in create method** to handle special fields cleanly:
   ```typescript
   // ✅ PREFER: Clean approach using destructuring
@@ -177,38 +178,35 @@
   - P2025: Record not found
 - ✅ Implement methods:
   - `create(dto, userId)` - auto-assign userId with destructuring
-  - `findAll()` - admin view (no select needed)
+  - `findAll(paginationDto)` - admin view (no select needed)
   - `findOne(id)` - single record (no select needed)
-  - `findByUserId(userId)` - user's own records (no select needed)
+  - `findByUserId(userId, paginationDto)` - user's own records (no select needed)
   - `update(id, dto, userId)` - with ownership check using verifyOwnership helper (no select needed)
   - `remove(id, userId)` - with ownership check using verifyOwnership helper (select only needed fields for response)
   - `verifyOwnership(id, userId)` - private helper method for ownership verification
   - Additional methods as needed (findByStatus, updateProgress, etc.)
-  - ✅ Pagination: For list endpoints support optional `page` and `limit` parameters (defaults: page=1, limit=10). Service signatures should accept pagination: `findAll(page = 1, limit = 10)` and `findByUserId(userId, page = 1, limit = 10)` and use Prisma's `skip` and `take`.
+  - ✅ **Pagination: All list endpoints MUST accept PaginationDto parameter** instead of individual page/limit parameters. Service signatures should be: `findAll(paginationDto: PaginationDto)` and `findByUserId(userId: number, paginationDto: PaginationDto)` and use PrismaPagination helper.
 
 Example service pagination pattern:
 ```typescript
-async findAll(page = 1, limit = 10): Promise<EntityResponse[]> {
-  const take = limit;
-  const skip = (page - 1) * take;
-
-  return this.prisma.entities.findMany({
-    orderBy: { created_at: 'desc' },
-    skip,
-    take,
-  });
+async findAll(paginationDto: PaginationDto): Promise<EntityResponse[]> {
+  return PrismaPagination.paginate<EntityResponse>(
+    this.prisma.entities,
+    paginationDto.page,
+    paginationDto.limit,
+    undefined,
+    { created_at: 'desc' }
+  );
 }
 
-async findByUserId(userId: number, page = 1, limit = 10): Promise<EntityResponse[]> {
-  const take = limit;
-  const skip = (page - 1) * take;
-
-  return this.prisma.entities.findMany({
-    where: { user_id: userId },
-    orderBy: { created_at: 'desc' },
-    skip,
-    take,
-  });
+async findByUserId(userId: number, paginationDto: PaginationDto): Promise<EntityResponse[]> {
+  return PrismaPagination.paginate<EntityResponse>(
+    this.prisma.entities,
+    paginationDto.page,
+    paginationDto.limit,
+    { user_id: userId },
+    { created_at: 'desc' }
+  );
 }
 ```
 
@@ -221,8 +219,20 @@ async findByUserId(userId: number, page = 1, limit = 10): Promise<EntityResponse
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get all entities with pagination' })
   @ApiResponse({ status: 200, description: 'Returns paginated entities' })
+  @ApiQuery({name: 'page', required: false})
+  @ApiQuery({name: 'limit', required: false})
   async findAll(@Query() paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
-    return this.service.findAll(paginationDto.page, paginationDto.limit);
+    return this.service.findAll(paginationDto);
+  }
+
+  @Get('my-entities')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get user entities with pagination' })
+  @ApiResponse({ status: 200, description: 'Returns paginated user entities' })
+  @ApiQuery({name: 'page', required: false})
+  @ApiQuery({name: 'limit', required: false})
+  async findMine(@Request() req, @Query() paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
+    return this.service.findByUserId(req.user.userId, paginationDto);
   }
 
   // ❌ AVOID: Manual query parameters
@@ -234,6 +244,7 @@ async findByUserId(userId: number, page = 1, limit = 10): Promise<EntityResponse
     return this.service.findAll(page, limit);
   }
   ```
+- ✅ **MUST pass PaginationDto object** to service methods, not individual page/limit parameters
 - ✅ Endpoint pattern:
 ```typescript
 @Post()
@@ -246,8 +257,8 @@ async create(@Body() dto: CreateDto, @Request() req): Promise<EntityResponse> {
 
 @Get('my-entities')  // NOT /user/:userId
 @ApiBearerAuth('access-token')
-async findMine(@Request() req): Promise<EntityResponse[]> {
-  return this.service.findByUserId(req.user.userId);
+async findMine(@Request() req, @Query() paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
+  return this.service.findByUserId(req.user.userId, paginationDto);
 }
 ```
 - ✅ Use `ParseIntPipe` for ID parameters
@@ -478,32 +489,32 @@ async updateBalance(id: number, amount: number, userId: number): Promise<EntityR
 ### Pattern 6: Pagination with PrismaPagination helper
 ```typescript
 // Service - Using PrismaPagination helper for consistent pagination
-async findAll(page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+async findAll(paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
   return PrismaPagination.paginate<EntityResponse>(
     this.prisma.entities,
-    page,
-    limit,
+    paginationDto.page,
+    paginationDto.limit,
     undefined,
     { created_at: 'desc' }
   );
 }
 
-async findByUserId(userId: number, page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+async findByUserId(userId: number, paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
   return PrismaPagination.paginate<EntityResponse>(
     this.prisma.entities,
-    page,
-    limit,
+    paginationDto.page,
+    paginationDto.limit,
     { user_id: userId },
     { created_at: 'desc' }
   );
 }
 
 // With complex filtering
-async findByStatus(status: string, page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+async findByStatus(status: string, paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
   return PrismaPagination.paginate<EntityResponse>(
     this.prisma.entities,
-    page,
-    limit,
+    paginationDto.page,
+    paginationDto.limit,
     { 
       status,
       is_active: true 
@@ -513,11 +524,11 @@ async findByStatus(status: string, page = 1, limit = 10): Promise<PaginatedRespo
 }
 
 // With relations
-async findAllWithRelations(page = 1, limit = 10): Promise<PaginatedResponse<EntityResponse>> {
+async findAllWithRelations(paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
   return PrismaPagination.paginate<EntityResponse>(
     this.prisma.entities,
-    page,
-    limit,
+    paginationDto.page,
+    paginationDto.limit,
     undefined,
     { created_at: 'desc' },
     { user: true, category: true }  // include relations
@@ -545,19 +556,23 @@ async findAllWithRelations(page = 1, limit = 10): Promise<PaginatedResponse<Enti
     }
   }
 })
+@ApiQuery({name: 'page', required: false})
+@ApiQuery({name: 'limit', required: false})
 async findAll(@Query() paginationDto: PaginationDto): Promise<PaginatedResponse<EntityResponse>> {
-  return this.service.findAll(paginationDto.page, paginationDto.limit);
+  return this.service.findAll(paginationDto);
 }
 
 @Get('user')
 @ApiBearerAuth('access-token')
 @ApiOperation({ summary: 'Get user entities with pagination' })
 @ApiResponse({ status: 200, description: 'Returns paginated user entities' })
+@ApiQuery({name: 'page', required: false})
+@ApiQuery({name: 'limit', required: false})
 async findMine(
   @Request() req,
   @Query() paginationDto: PaginationDto
 ): Promise<PaginatedResponse<EntityResponse>> {
-  return this.service.findByUserId(req.user.userId, paginationDto.page, paginationDto.limit);
+  return this.service.findByUserId(req.user.userId, paginationDto);
 }
 ```
 
