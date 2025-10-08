@@ -2,7 +2,7 @@ import {Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit} from "@nestjs
 import * as Ably from 'ably';
 import {RealtimeChannel} from "ably";
 import {OnEvent} from "@nestjs/event-emitter";
-import {EVENTS} from "../common/constants/events.constants";
+import {EVENTS, SOCKET_EVENTS} from "../common/constants/events.constants";
 import {ExpenseResponse} from "../expenses/interfaces/expense.interface";
 import {RecurringTransactionResponse} from "../recurring-transactions/interfaces/recurring-transaction.interface";
 
@@ -49,7 +49,7 @@ export class AblyGateway implements OnModuleInit, OnModuleDestroy {
     }
 
     @OnEvent(EVENTS.RECURRING_EXPENSE.EXECUTED)
-    async  handleRecuringExpense(recurring: RecurringTransactionResponse) {
+    async handleRecuringExpense(recurring: RecurringTransactionResponse) {
         this.logger.debug(`📤 Publishing recurring expense.created: #${recurring.recurring_id}`);
 
         const {user_id, ...recurringData} = recurring;
@@ -61,6 +61,21 @@ export class AblyGateway implements OnModuleInit, OnModuleDestroy {
             this.logger.log(`✅ Published recurring expense #${recurring.recurring_id} to Ably`);
         } catch (error) {
             this.logger.error(`❌ Failed to publish recurring expense: ${error.message}`);
+        }
+    }
+
+    @OnEvent(EVENTS.SAVINGS_GOAL.COMPLETE)
+    async handleSavingsGoalComplete(data: any) {
+        this.logger.debug(`📤 Publishing savings goal complete: #${data.dataToEmit.goal_id}`);
+
+        const {user_id, ...goalData} = data.dataToEmit;
+
+        try {
+            // Publish to channel với data cho USER CỤ THỂ
+            await this.publishToUser(user_id, SOCKET_EVENTS.SAVINGS_GOAL.COMPLETE, goalData);
+            this.logger.log(`✅ Published savings goal #${data.dataToEmit.goal_id}, event name: ${SOCKET_EVENTS.SAVINGS_GOAL.COMPLETE} to Ably`);
+        } catch (error) {
+            this.logger.error(`❌ Failed to publish savings goal: ${error.message}`);
         }
     }
 

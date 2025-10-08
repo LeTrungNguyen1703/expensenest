@@ -1,12 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe, HttpCode, HttpStatus, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, ParseIntPipe, HttpCode, HttpStatus, Request, Query } from '@nestjs/common';
 import { SavingsGoalsService } from './savings-goals.service';
 import { CreateSavingsGoalDto } from './dto/create-savings-goal.dto';
 import { UpdateSavingsGoalDto } from './dto/update-savings-goal.dto';
 import { UpdateProgressDto } from './dto/update-progress.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { SavingsGoalResponse } from './interfaces/savings-goal.interface';
 import { goal_status_enum } from '@prisma/client';
+import { PaginationDto } from '../common/dto/pagination.dto';
+import { PaginatedResponse } from '../common/interfaces/paginated-response.interface';
 
 @ApiTags('savings-goals')
 @Controller('savings-goals')
@@ -27,27 +29,39 @@ export class SavingsGoalsController {
 
   @Get()
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Get all savings goals' })
-  @ApiResponse({ status: 200, description: 'Returns all savings goals', type: [SavingsGoalResponse] })
-  async findAll(): Promise<SavingsGoalResponse[]> {
-    return this.savingsGoalsService.findAll();
+  @ApiOperation({ summary: 'Get all savings goals (admin) with pagination' })
+  @ApiResponse({ status: 200, description: 'Returns paginated savings goals' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default 10)' })
+  async findAll(@Query() paginationDto: PaginationDto): Promise<PaginatedResponse<SavingsGoalResponse>> {
+    const page = paginationDto.page ?? 1;
+    const limit = paginationDto.limit ?? 10;
+    return this.savingsGoalsService.findAll(page, limit);
   }
 
   @Get('my-goals')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Get all savings goals for the authenticated user' })
+  @ApiOperation({ summary: 'Get all savings goals for the authenticated user with pagination' })
   @ApiResponse({ status: 200, description: 'Returns user savings goals', type: [SavingsGoalResponse] })
-  async findByUserId(@Request() req): Promise<SavingsGoalResponse[]> {
-    return this.savingsGoalsService.findByUserId(req.user.userId);
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default 10)' })
+  async findByUserId(@Request() req, @Query() paginationDto: PaginationDto): Promise<PaginatedResponse<SavingsGoalResponse>> {
+    const page = paginationDto.page ?? 1;
+    const limit = paginationDto.limit ?? 10;
+    return this.savingsGoalsService.findByUserId(req.user.userId, page, limit);
   }
 
   @Get('status/:status')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Get savings goals by status for the authenticated user' })
+  @ApiOperation({ summary: 'Get savings goals by status for the authenticated user with pagination' })
   @ApiParam({ name: 'status', description: 'Goal status', enum: ['ACTIVE', 'COMPLETED', 'PAUSED', 'CANCELLED'] })
   @ApiResponse({ status: 200, description: 'Returns savings goals with the specified status', type: [SavingsGoalResponse] })
-  async findByStatus(@Param('status') status: goal_status_enum, @Request() req): Promise<SavingsGoalResponse[]> {
-    return this.savingsGoalsService.findByStatus(req.user.userId, status);
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default 10)' })
+  async findByStatus(@Param('status') status: goal_status_enum, @Request() req, @Query() paginationDto: PaginationDto): Promise<PaginatedResponse<SavingsGoalResponse>> {
+    const page = paginationDto.page ?? 1;
+    const limit = paginationDto.limit ?? 10;
+    return this.savingsGoalsService.findByStatus(req.user.userId, status, page, limit);
   }
 
   @Get(':id')
