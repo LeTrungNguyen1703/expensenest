@@ -32,7 +32,7 @@ export class SummaryController {
         name: 'date',
         type: String,
         required: true,
-        description: 'Date (ISO string, e.g. 2025-10-01) used to select the month'
+        description: 'Date (ISO string, e.g. 2025-10) used to select the month'
     })
     @ApiResponse({status: 200, description: 'Summary returned successfully'})
     @ApiResponse({status: 400, description: 'Bad Request - invalid parameters'})

@@ -4,13 +4,16 @@ import {PrismaService} from "../prisma/prisma.service";
 import {transaction_type_enum} from "@prisma/client";
 import {SummaryResponse} from "./dto/response-summary.dto";
 import {CACHE_MANAGER, Cache} from "@nestjs/cache-manager";
+import {ExpenseResponse} from "../expenses/interfaces/expense.interface";
+import {OnEvent} from "@nestjs/event-emitter";
+import {EVENTS} from "../common/constants/events.constants";
 
 @Injectable()
 export class SummaryService {
     private logger = new Logger(SummaryService.name);
 
     constructor(private readonly prisma: PrismaService,
-                @Inject(CACHE_MANAGER) private cacheManager: Cache
+                @Inject(CACHE_MANAGER) private cacheManager: Cache,
     ) {
     }
 
@@ -74,8 +77,13 @@ export class SummaryService {
         }
 
         this.logger.log(`Summary for category ID ${categoryId} in ${date.getMonth() + 1}/${date.getFullYear()}:`, summary);
-        await this.cacheManager.set(cacheKey, summary, 1800); // Cache for 30 minutes
-        this.logger.debug(`Cache set for key: ${cacheKey} with 30 minutes TTL`);
+        try {
+            // TTL phải là milliseconds cho Keyv/KeyvRedis: 1800000ms = 30 phút
+            await this.cacheManager.set(cacheKey, summary, 1800000);
+            this.logger.debug(`✅ Cache set for key: ${cacheKey} with 30 minutes TTL`);
+        } catch (error) {
+            this.logger.error(`❌ Failed to set cache for key: ${cacheKey}`, error.message);
+        }
 
         return summary;
     }
@@ -89,4 +97,30 @@ export class SummaryService {
         return [startDate, endDate];
     }
 
+    @OnEvent(EVENTS.EXPENSE.CREATED)
+    async delCacheWhenExpenseChange(expense: ExpenseResponse) {
+        this.logger.debug(`Event received: ${EVENTS.EXPENSE.CREATED} for expense ID ${expense.expense_id}`);
+        const date = new Date(expense.expense_date);
+        const cacheKey = `summary_${expense.user_id}_${expense.category_id}_${date.getFullYear()}_${date.getMonth() + 1}_${expense.transaction_type}`;
+        await this.cacheManager.del(cacheKey);
+        this.logger.debug(`Cache deleted for key: ${cacheKey}`);
+    }
+
+    @OnEvent(EVENTS.EXPENSE.UPDATED)
+    async delCacheWhenExpenseUpdated(expense: ExpenseResponse) {
+        this.logger.debug(`Event received: ${EVENTS.EXPENSE.UPDATED} for expense ID ${expense.expense_id}`);
+        const date = new Date(expense.expense_date);
+        const cacheKey = `summary_${expense.user_id}_${expense.category_id}_${date.getFullYear()}_${date.getMonth() + 1}_${expense.transaction_type}`;
+        await this.cacheManager.del(cacheKey);
+        this.logger.debug(`Cache deleted for key: ${cacheKey}`);
+    }
+
+    @OnEvent(EVENTS.EXPENSE.DELETED)
+    async delCacheWhenExpenseDeleted(expense: ExpenseResponse) {
+        this.logger.debug(`Event received: ${EVENTS.EXPENSE.DELETED} for expense ID ${expense.expense_id}`);
+        const date = new Date(expense.expense_date);
+        const cacheKey = `summary_${expense.user_id}_${expense.category_id}_${date.getFullYear()}_${date.getMonth() + 1}_${expense.transaction_type}`;
+        await this.cacheManager.del(cacheKey);
+        this.logger.debug(`Cache deleted for key: ${cacheKey}`);
+    }
 }
