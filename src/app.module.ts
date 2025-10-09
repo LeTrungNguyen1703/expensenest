@@ -24,9 +24,11 @@ import {ExpressAdapter} from "@bull-board/express";
 import {BullMQAdapter} from "@bull-board/api/bullMQAdapter";
 import {AdminModule} from './admin/admin.module';
 import {ExpenseGatewayModule} from './expense-gateway/expense-gateway.module';
-import { EventEmitterModule } from '@nestjs/event-emitter';
-import { AblyModule } from './ably/ably.module';
+import {EventEmitterModule} from '@nestjs/event-emitter';
+import {AblyModule} from './ably/ably.module';
 import {QUEUE_NAMES} from "./queue-constants";
+import {SummaryModule} from './summary/summary.module';
+
 @Module({
     imports: [ConfigModule.forRoot({
         isGlobal: true,
@@ -176,6 +178,7 @@ import {QUEUE_NAMES} from "./queue-constants";
         AdminModule,
         ExpenseGatewayModule,
         AblyModule,
+        SummaryModule,
     ],
     controllers: [AppController],
     providers: [AppService],
