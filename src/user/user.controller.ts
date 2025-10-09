@@ -65,6 +65,16 @@ export class UserController {
         return this.userService.findOne(id);
     }
 
+    @Get('me/profile')
+    @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('access-token')
+    @ApiOperation({summary: 'Get current user profile'})
+    @ApiResponse({status: 200, description: 'Returns the current user profile', type: UserResponse})
+    @ApiUnauthorizedResponse({description: 'Unauthorized'})
+    async getProfile(@Request() req): Promise<UserResponse> {
+        return this.userService.findOne(req.user.userId);
+    }
+
     @Patch(':id')
     @UseGuards(JwtAuthGuard)
     @ApiBearerAuth('access-token')

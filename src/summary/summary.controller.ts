@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import {SummaryService} from './summary.service';
 import {transaction_type_enum} from "@prisma/client";
-import {ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse} from '@nestjs/swagger';
+import {ApiTags, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiBearerAuth} from '@nestjs/swagger';
 import {JwtAuthGuard} from "../auth/jwt-auth.guard";
 
 @ApiTags('summary')
@@ -37,6 +37,7 @@ export class SummaryController {
     @ApiResponse({status: 200, description: 'Summary returned successfully'})
     @ApiResponse({status: 400, description: 'Bad Request - invalid parameters'})
     @UseGuards(JwtAuthGuard)
+    @ApiBearerAuth('access-token')
     getSummaryByMonthAndCategory(
         @Param('categoryId', ParseIntPipe) categoryId: number,
         @Query('transactionType', new ParseEnumPipe(transaction_type_enum)) transactionType: transaction_type_enum,

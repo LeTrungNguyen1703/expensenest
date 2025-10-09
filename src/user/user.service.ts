@@ -67,7 +67,7 @@ export class UserService {
             page,
             limit,
             undefined,
-            { created_at: 'desc' },
+            {created_at: 'desc'},
             undefined,
             select,
         );
@@ -91,6 +91,21 @@ export class UserService {
             throw new NotFoundException(`User with ID ${id} not found`);
         }
 
+        return user;
+    }
+
+    async getProfile(userId: number): Promise<UserResponse> {
+        const user = await this.prisma.users.findUnique({
+            where: {user_id: userId},
+        });
+
+        if (!user) {
+            throw new NotFoundException(`User with ID ${userId} not found`);
+        }
+
+        if(user.user_id !== userId) {
+            throw new BadRequestException('You do not have permission to view this profile');
+        }
         return user;
     }
 
