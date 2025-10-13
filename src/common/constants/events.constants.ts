@@ -9,6 +9,9 @@ export const EVENTS = {
     },
     SAVINGS_GOAL: {
         COMPLETE: 'recurring.expense.complete',
+    },
+    BUDGET: {
+        LIMIT_EXCEEDED: 'budget.limit.exceeded',
     }
 } as const;
 
@@ -23,6 +26,9 @@ export const SOCKET_EVENTS = {
     },
     SAVINGS_GOAL: {
         COMPLETE: 'savings:goal:complete',
+    },
+    BUDGET: {
+        LIMIT_EXCEEDED: 'budget:limit:exceeded',
     }
-}as const
+} as const
 

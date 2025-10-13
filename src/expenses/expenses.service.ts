@@ -47,7 +47,7 @@ export class ExpensesService {
 
     async findOne(id: number): Promise<ExpenseResponse> {
         const expense = await this.prisma.expenses.findUnique({
-            where: {expense_id: id},
+            where: {expense_id: id}
         });
 
         if (!expense) {
@@ -56,6 +56,7 @@ export class ExpensesService {
 
         return expense;
     }
+
 
     async findByUserId(userId: number): Promise<ExpenseResponse[]> {
         return this.prisma.expenses.findMany({

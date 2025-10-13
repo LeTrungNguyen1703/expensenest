@@ -71,6 +71,18 @@ export class BudgetsService {
         );
     }
 
+    async findActiveByExpenseCategoryId(categoryId: number): Promise<BudgetResponse[]> {
+        return this.prisma.budgets.findMany({
+            where: {
+                category_id: categoryId,
+                is_active: true,
+            },
+            orderBy: {
+                start_date: 'desc',
+            },
+        });
+    }
+
     async update(
         id: number,
         updateBudgetDto: UpdateBudgetDto,
@@ -148,6 +160,7 @@ export class BudgetsService {
             throw error;
         }
     }
+
 
     private async verifyOwnership(budgetId: number, userId: number) {
         const existing = await this.prisma.budgets.findUnique({

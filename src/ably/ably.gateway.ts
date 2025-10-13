@@ -5,6 +5,7 @@ import {OnEvent} from "@nestjs/event-emitter";
 import {EVENTS, SOCKET_EVENTS} from "../common/constants/events.constants";
 import {ExpenseResponse} from "../expenses/interfaces/expense.interface";
 import {RecurringTransactionResponse} from "../recurring-transactions/interfaces/recurring-transaction.interface";
+import {BudgetResponse} from "../budgets/interfaces/budget.interface";
 
 @Injectable()
 export class AblyGateway implements OnModuleInit, OnModuleDestroy {
@@ -34,7 +35,7 @@ export class AblyGateway implements OnModuleInit, OnModuleDestroy {
 
     @OnEvent(EVENTS.EXPENSE.CREATED)
     async handleExpenseCreated(expense: ExpenseResponse) {
-        this.logger.debug(`📤 Publishing expense.created: #${expense.expense_id}`);
+        this.logger.debug(`📤 Publishing expense.created: #${expense}`);
 
         const {user_id, ...expenseData} = expense;
 
@@ -50,7 +51,7 @@ export class AblyGateway implements OnModuleInit, OnModuleDestroy {
 
     @OnEvent(EVENTS.RECURRING_EXPENSE.EXECUTED)
     async handleRecuringExpense(recurring: RecurringTransactionResponse) {
-        this.logger.debug(`📤 Publishing recurring expense.created: #${recurring.recurring_id}`);
+        this.logger.debug(`📤 Publishing recurring expense.created: #${recurring}`);
 
         const {user_id, ...recurringData} = recurring;
 
@@ -66,7 +67,7 @@ export class AblyGateway implements OnModuleInit, OnModuleDestroy {
 
     @OnEvent(EVENTS.SAVINGS_GOAL.COMPLETE)
     async handleSavingsGoalComplete(data: any) {
-        this.logger.debug(`📤 Publishing savings goal complete: #${data.dataToEmit.goal_id}`);
+        this.logger.debug(`📤 Publishing savings goal complete: #${JSON.stringify(data, null, 2)}`);
 
         const {user_id, ...goalData} = data.dataToEmit;
 
@@ -76,6 +77,24 @@ export class AblyGateway implements OnModuleInit, OnModuleDestroy {
             this.logger.log(`✅ Published savings goal #${data.dataToEmit.goal_id}, event name: ${SOCKET_EVENTS.SAVINGS_GOAL.COMPLETE} to Ably`);
         } catch (error) {
             this.logger.error(`❌ Failed to publish savings goal: ${error.message}`);
+        }
+    }
+
+    @OnEvent(EVENTS.BUDGET.LIMIT_EXCEEDED)
+    async handleBudgetLimitExceeded(data: { budget: BudgetResponse, total: number, expense: ExpenseResponse }) {
+        this.logger.debug(`📤 Publishing budget limit exceeded: #${JSON.stringify(data, null, 2)}`);
+
+        const {user_id, ...budgetData} = data.budget;
+
+        try {
+            // Publish to channel với data cho USER CỤ THỂ
+            await this.publishToUser(user_id, SOCKET_EVENTS.BUDGET.LIMIT_EXCEEDED, {
+                message: `You have exceeded your budget limit for ${budgetData.budget_name}. Total spending: ${data.total}, Budget limit: ${budgetData.amount}`
+
+            });
+            this.logger.log(`✅ Published budget limit exceeded #${data.budget.budget_id}, event name: ${SOCKET_EVENTS.BUDGET.LIMIT_EXCEEDED} to Ably`);
+        } catch (error) {
+            this.logger.error(`❌ Failed to publish budget limit exceeded: ${error.message}`);
         }
     }
 
