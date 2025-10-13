@@ -287,6 +287,7 @@ async findMine(@Request() req, @Query() paginationDto: PaginationDto): Promise<P
 - ✅ Validate enums with `@IsEnum(enum_name)`
 - ✅ Proper null handling: `field ?? null` or `field ?? defaultValue`
 - ✅ Clear return types for all async methods
+- ❌ Using `as any` is forbidden — prefer proper typing or explicit narrow casts (for example `as Prisma.budgetsUpdateInput & { start_date?: Date | null }`) so the code remains type-safe and self-documenting.
 
 ### 9. **Best Practices**
 - ✅ Sorting: `orderBy` in findMany queries
@@ -607,3 +608,4 @@ async findMine(
 - [ ] DTO validation with class-validator decorators
 - [ ] Nullable fields use `| null` not `?:`
 - [ ] Pagination support documented and implemented (page & limit query params with defaults)
+- [ ] Do NOT use `as any` anywhere in the codebase; prefer explicit, narrow casts or proper type definitions.
