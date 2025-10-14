@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsOptional, IsInt, Min, IsEnum, IsDateString } from 'class-validator';
+  import { IsNotEmpty, IsString, IsOptional, IsInt, Min, IsEnum, IsDateString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { transaction_type_enum } from '@prisma/client';
 
