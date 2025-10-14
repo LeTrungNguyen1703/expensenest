@@ -28,6 +28,7 @@ import {EventEmitterModule} from '@nestjs/event-emitter';
 import {AblyModule} from './ably/ably.module';
 import {QUEUE_NAMES} from "./queue-constants";
 import {SummaryModule} from './summary/summary.module';
+import {HealthModule} from './health/health.module';
 
 @Module({
     imports: [ConfigModule.forRoot({
@@ -179,6 +180,7 @@ import {SummaryModule} from './summary/summary.module';
         ExpenseGatewayModule,
         AblyModule,
         SummaryModule,
+        HealthModule,
     ],
     controllers: [AppController],
     providers: [AppService],
