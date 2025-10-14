@@ -3,10 +3,12 @@ import {AppModule} from './app.module';
 import {ValidationPipe} from "@nestjs/common";
 import {IoAdapter} from "@nestjs/platform-socket.io";
 import {DocumentBuilder, SwaggerModule} from "@nestjs/swagger";
+import {LoggingInterceptor} from "./logging.interceptor";
 
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
     app.useGlobalPipes(new ValidationPipe({whitelist: true, transform: true}));
+    app.useGlobalInterceptors(new LoggingInterceptor());
     app.useWebSocketAdapter(new IoAdapter(app)); // Pass the app instance
 
     // Swagger setup
@@ -33,6 +35,7 @@ async function bootstrap() {
         deepScanRoutes: true,
     });
 
+    // Setup Swagger UI at /api
     SwaggerModule.setup('api', app, document, {
         swaggerOptions: {
             tagsSorter: 'alpha',
@@ -40,6 +43,9 @@ async function bootstrap() {
             persistAuthorization: true,
         },
         customSiteTitle: 'Expense Manager API Docs',
+        // Enable JSON/YAML download buttons
+        jsonDocumentUrl: 'api-json',
+        yamlDocumentUrl: 'api-yaml',
     });
 
     await app.listen(process.env.PORT ?? 3000);

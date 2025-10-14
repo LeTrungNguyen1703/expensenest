@@ -29,6 +29,9 @@ import {AblyModule} from './ably/ably.module';
 import {QUEUE_NAMES} from "./queue-constants";
 import {SummaryModule} from './summary/summary.module';
 import {HealthModule} from './health/health.module';
+import {PrometheusModule} from "@willsoto/nestjs-prometheus";
+import {LoggingInterceptor} from "./logging.interceptor";
+import {APP_INTERCEPTOR} from "@nestjs/core";
 
 @Module({
     imports: [ConfigModule.forRoot({
@@ -162,7 +165,8 @@ import {HealthModule} from './health/health.module';
             maxListeners: 20,          // tăng nhẹ giới hạn an toàn
             verboseMemoryLeak: true,   // nên bật trong môi trường dev để dễ phát hiện rò rỉ
             ignoreErrors: false,
-        })
+        }),
+        PrometheusModule.register()
         ,
         UserModule,
         PrismaModule,
@@ -183,7 +187,10 @@ import {HealthModule} from './health/health.module';
         HealthModule,
     ],
     controllers: [AppController],
-    providers: [AppService],
+    providers: [AppService, {
+        provide: APP_INTERCEPTOR,
+        useClass: LoggingInterceptor,
+    }],
 })
 export class AppModule {
 }
